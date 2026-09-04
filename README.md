@@ -72,11 +72,22 @@ graph TB
 
 ---
 
+## 🎯 Choose Your Integration Method
+
+UML-Architect can be used in two ways depending on your environment:
+
+| Feature | Method A: Universal MCP Server | Method B: Pure Skill Agent / Rule |
+| :--- | :---: | :---: |
+| **Node.js Required?** | **Yes** (Node.js >= 18.0.0 via `npx`) | **No** (Zero Runtime Dependencies) 🚀 |
+| **How it Operates** | Runs in background via stdio JSON-RPC | LLM Agent's native reasoning engine |
+| **Best For** | Full IDE tool-calling integration & CLI | Environments without Node.js |
+| **Setup** | Add MCP JSON to IDE settings | Drop `.md` rule/skill file into repo |
+
+---
+
 ## 🚀 Quick Start
 
-Choose the workflow that fits you best:
-
-### 💬 Option 1: AI Agent Chat (Simplest & Recommended — Zero Commands)
+### 💬 Method A: AI Agent Chat via MCP (Recommended — Requires Node.js)
 Add UML-Architect directly to your AI IDE (Cursor, Claude Desktop, Google Antigravity, Windsurf, Kiro, Continue.dev, etc.) via MCP:
 ```json
 {
@@ -97,7 +108,22 @@ The agent autonomously traces your codebase, validates the syntax, and renders t
 
 ---
 
-### 💻 Option 2: Terminal CLI (For Scripts, CI/CD, or Standalone Use)
+### 📄 Method B: Pure Skill Agent / Rule File (No Node.js Required)
+If you don't have Node.js installed on your machine, you can still use UML-Architect with **100% fidelity** by simply copying the rule file for your IDE into your project:
+
+* **Google Antigravity**: Copy [`SKILL.md`](SKILL.md) to `.agents/skills/uml-architect/SKILL.md`
+* **Cursor**: Copy [`adapters/cursor/uml-architect.mdc`](adapters/cursor/uml-architect.mdc) to `.cursor/rules/uml-architect.mdc`
+* **Kiro**: Copy [`adapters/kiro/uml-architect.md`](adapters/kiro/uml-architect.md) to `.kiro/steering/uml-architect.md`
+* **Claude Code**: Copy [`adapters/claude/CLAUDE.md`](adapters/claude/CLAUDE.md) to `CLAUDE.md`
+* **Windsurf**: Copy [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) to `.windsurfrules`
+* **GitHub Copilot**: Copy [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) to `.github/copilot-instructions.md`
+* **Roo Code / Cline**: Copy [`adapters/cline/.clinerules`](adapters/cline/.clinerules) to `.clinerules`
+
+Your AI Agent will read the rule file and analyze your codebase directly using its native intelligence—**zero installation needed!**
+
+---
+
+### 💻 Method C: Terminal CLI (For Scripts, CI/CD, or Standalone Use)
 Generate diagrams directly from your command line:
 ```bash
 # Trace an API endpoint

@@ -28,11 +28,22 @@
 
 ---
 
+## 🎯 Pilih Metode Integrasi Anda
+
+UML-Architect dapat digunakan dengan 2 metode sesuai lingkungan kerja Anda:
+
+| Fitur | Metode A: Universal MCP Server | Metode B: Pure Skill Agent / Rule File |
+| :--- | :---: | :---: |
+| **Butuh Node.js?** | **Ya** (Node.js >= 18.0.0 via `npx`) | **Tidak Butuh** (Zero Runtime Dependencies) 🚀 |
+| **Cara Kerja** | Berjalan di background via stdio JSON-RPC | Otak bawaan LLM Agent membaca instruksi |
+| **Paling Cocok Untuk** | Integrasi tool-calling otomatis & CLI | Lingkungan tanpa Node.js / Tanpa instalasi |
+| **Setup** | Pasang JSON MCP di pengaturan IDE | Salin file rule `.md` ke dalam repositori |
+
+---
+
 ## 🚀 Panduan Cepat
 
-Pilih alur kerja yang paling nyaman bagi Anda:
-
-### 💬 Opsi 1: Chat Langsung di AI IDE (Paling Simpel — Tanpa Perintah Terminal)
+### 💬 Metode A: Chat AI via Server MCP (Direkomendasikan — Perlu Node.js)
 Cukup pasang UML-Architect sekali saja ke pengaturan MCP IDE Anda (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, Continue.dev, dll.):
 ```json
 {
@@ -53,7 +64,22 @@ Agent akan menelusuri kode, memvalidasi sintaks, dan menyajikan diagram secara i
 
 ---
 
-### 💻 Opsi 2: Lewat Terminal CLI (Untuk Skrip, CI/CD, atau Penggunaan Mandiri)
+### 📄 Metode B: Pure Skill Agent / Rule File (Tanpa Butuh Node.js Sama Sekali)
+Jika Anda **tidak memiliki Node.js** di komputer, Anda tetap bisa menggunakan UML-Architect dengan **akurasi 100%** cukup dengan menyalin file rule sesuai IDE yang Anda pakai ke dalam folder proyek Anda:
+
+* **Google Antigravity**: Salin [`SKILL.md`](SKILL.md) ke `.agents/skills/uml-architect/SKILL.md`
+* **Cursor**: Salin [`adapters/cursor/uml-architect.mdc`](adapters/cursor/uml-architect.mdc) ke `.cursor/rules/uml-architect.mdc`
+* **Kiro**: Salin [`adapters/kiro/uml-architect.md`](adapters/kiro/uml-architect.md) ke `.kiro/steering/uml-architect.md`
+* **Claude Code**: Salin [`adapters/claude/CLAUDE.md`](adapters/claude/CLAUDE.md) ke `CLAUDE.md`
+* **Windsurf**: Salin [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) ke `.windsurfrules`
+* **GitHub Copilot**: Salin [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) ke `.github/copilot-instructions.md`
+* **Roo Code / Cline**: Salin [`adapters/cline/.clinerules`](adapters/cline/.clinerules) ke `.clinerules`
+
+Asisten AI di IDE Anda akan langsung membaca aturan tersebut dan menganalisis kode Anda menggunakan kecerdasan internalnya—**100% tanpa instalasi apa pun!**
+
+---
+
+### 💻 Metode C: Lewat Terminal CLI (Untuk Skrip, CI/CD, atau Penggunaan Mandiri)
 Buat diagram langsung dari terminal:
 ```bash
 # Analisis alur dari endpoint API
