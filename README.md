@@ -364,6 +364,15 @@ Alur eksekusi ini melibatkan **4 komponen utama**:
 
 ---
 
+## 🤝 Contributing & Community Evaluations
+
+Contributions are warmly welcomed! Whether adding new framework profiles, submitting real-world architectural evaluation RFCs, or creating new AI agent adapters:
+- Read our full [Contributing Guide](CONTRIBUTING.md).
+- Submit real-world architectural evaluation RFCs in [evaluations/](evaluations/).
+- Report bugs or propose new features via [GitHub Issues](https://github.com/hanifalkauni/uml-architect/issues).
+
+---
+
 ## 📜 License & Citation
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.

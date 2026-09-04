@@ -364,6 +364,15 @@ Alur eksekusi ini melibatkan **4 komponen utama**:
 
 ---
 
+## 🤝 Kontribusi & Evaluasi Komunitas
+
+Kontribusi dari komunitas sangat kami nantikan! Baik berupa penambahan profil framework baru, pengiriman proposal evaluasi kasus arsitektur riil, maupun pembuatan adapter AI agent baru:
+- Baca panduan kontribusi lengkap di [CONTRIBUTING.md](CONTRIBUTING.md).
+- Kirimkan proposal studi kasus arsitektur riil di [evaluations/](evaluations/).
+- Laporkan kendala teknis atau usulkan ide fitur di [GitHub Issues](https://github.com/hanifalkauni/uml-architect/issues).
+
+---
+
 ## 📜 Lisensi
 
 Didistribusikan di bawah lisensi terbuka **MIT License**. Lihat [LICENSE](LICENSE) untuk detail lengkap.

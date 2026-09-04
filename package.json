@@ -12,9 +12,11 @@
     "core",
     "profiles",
     "adapters",
+    "evaluations",
     "uml-architect.config.json",
     "schema.json",
     "SKILL.md",
+    "CONTRIBUTING.md",
     "README.md",
     "README.id.md",
     "LICENSE"
