@@ -246,6 +246,98 @@ await runAsyncTest('McpServer: Eksekusi tool generate_uml_diagram', async () => 
   assert.ok(res.result.content[0].text.includes('sequenceDiagram'));
 });
 
+// 14. Test TracerEngine: Analisis Multi-Tier Laravel Controller (sample_laravel_cache_s3.php)
+await runAsyncTest('TracerEngine: Analisis Multi-Tier Laravel Controller & Local Method Crawling (sample_laravel_cache_s3.php)', async () => {
+  const tracer = new TracerEngine({ rootDir: path.resolve(__dirname, '..') });
+  const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
+  const trace = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
+    targetFile: fixturePath,
+    targetMethod: 'index'
+  });
+
+  // Verifikasi partisipan multi-tier dan stereotipe infrastruktur
+  assert.ok(trace.participants.some(p => p.id === 'Ctrl' && p.layer === 'Application Layer'), 'Ctrl harus berada di Application Layer');
+  assert.ok(trace.participants.some(p => p.id === 'Auth' && p.layer === 'Application Layer'), 'Auth harus berada di Application Layer');
+  assert.ok(trace.participants.some(p => p.id === 'CampaignModel' && p.layer === 'Persistence & Cache Layer'), 'CampaignModel harus di Persistence & Cache Layer');
+  assert.ok(trace.participants.some(p => p.id === 'Redis' && p.layer === 'Persistence & Cache Layer'), 'Redis harus di Persistence & Cache Layer');
+  assert.ok(trace.participants.some(p => p.id === 'CompiledModel' && p.layer === 'Persistence & Cache Layer'), 'CompiledModel harus di Persistence & Cache Layer');
+  assert.ok(trace.participants.some(p => p.id === 'S3' && p.layer === 'Cloud Storage'), 'S3Helper harus di Cloud Storage');
+
+  // Verifikasi pola Cache-Aside dan branching
+  assert.ok(trace.steps.some(s => s.type === 'alt_start' && s.condition.includes('reload == true')), 'Harus mendeteksi invalidasi reload/hdel');
+  assert.ok(trace.steps.some(s => s.type === 'alt_start' && s.condition.includes('Cache HIT')), 'Harus mendeteksi Cache HIT');
+  assert.ok(trace.steps.some(s => s.type === 'alt_else' && s.condition.includes('Cache MISS')), 'Harus mendeteksi Cache MISS');
+  assert.ok(trace.steps.some(s => s.from === 'Ctrl' && s.to === 'S3'), 'Harus terdapat interaksi dari Ctrl ke S3 hasil crawling');
+  assert.ok(trace.steps.some(s => s.from === 'Ctrl' && s.to === 'Redis' && s.message.includes('hset')), 'Harus terdapat penyimpanan ke Redis (hset)');
+
+  // Verifikasi ORM Exception
+  assert.ok(trace.errorBranches.some(e => e.type === 'ModelNotFoundException' && e.status === 404), 'Harus mendeteksi ModelNotFoundException (404)');
+});
+
+// 15. Test SynthesizerEngine: Render Mermaid Sequence Diagram dengan Box Layer Grouping
+await runAsyncTest('SynthesizerEngine: Render Mermaid Diagram dengan Box Layer Grouping & Validasi', async () => {
+  const tracer = new TracerEngine({ rootDir: path.resolve(__dirname, '..') });
+  const synth = new SynthesizerEngine();
+  const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
+  const trace = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
+    targetFile: fixturePath,
+    targetMethod: 'index'
+  });
+
+  const res = synth.generateSequenceDiagram(trace, 'standard');
+  assert.ok(res.isValid, 'Diagram Mermaid yang dihasilkan harus valid 100%');
+  assert.ok(res.fixedMermaid.includes('box "Application Layer" #1e293b'), 'Harus menyertakan box Application Layer');
+  assert.ok(res.fixedMermaid.includes('box "Persistence & Cache Layer" #0f172a'), 'Harus menyertakan box Persistence & Cache Layer');
+  assert.ok(res.fixedMermaid.includes('box "Cloud Storage" #1e1e2e'), 'Harus menyertakan box Cloud Storage');
+  assert.ok(res.fixedMermaid.includes('alt Cache HIT'), 'Harus menyertakan percabangan alt Cache HIT');
+  assert.ok(res.fixedMermaid.includes('else Cache MISS'), 'Harus menyertakan percabangan else Cache MISS');
+});
+
+// 16. Test SynthesizerEngine: Render PlantUML dengan Box Layer Grouping
+await runAsyncTest('SynthesizerEngine: Render PlantUML dengan Box Layer Grouping', async () => {
+  const tracer = new TracerEngine({ rootDir: path.resolve(__dirname, '..') });
+  const synth = new SynthesizerEngine();
+  const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
+  const trace = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
+    targetFile: fixturePath,
+    targetMethod: 'index'
+  });
+
+  const puml = synth.generatePlantUML(trace);
+  assert.ok(puml.includes('@startuml'));
+  assert.ok(puml.includes('box "Application Layer" #LightBlue'));
+  assert.ok(puml.includes('box "Persistence & Cache Layer" #LightYellow'));
+  assert.ok(puml.includes('box "Cloud Storage" #LightCyan'));
+  assert.ok(puml.includes('end box'));
+  assert.ok(puml.includes('@enduml'));
+});
+
+// 17. Test Granularitas Detail Level (L1, L2, L3)
+await runAsyncTest('Detail Level Granularity: Perbedaan Output L1, L2, dan L3', async () => {
+  const tracer = new TracerEngine({ rootDir: path.resolve(__dirname, '..') });
+  const synth = new SynthesizerEngine();
+  const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
+
+  // L1: High-level simplified
+  const traceL1 = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
+    targetFile: fixturePath,
+    detailLevel: 'L1'
+  });
+  const resL1 = synth.generateSequenceDiagram(traceL1, 'L1');
+  assert.ok(resL1.isValid);
+  assert.ok(!resL1.fixedMermaid.includes('Validasi Gagal'), 'L1 tidak boleh menyertakan blok alt validasi');
+
+  // L3: Deep technical with notes
+  const traceL3 = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
+    targetFile: fixturePath,
+    detailLevel: 'L3'
+  });
+  const resL3 = synth.generateSequenceDiagram(traceL3, 'L3');
+  assert.ok(resL3.isValid);
+  assert.ok(resL3.fixedMermaid.includes('Note over Ctrl,Redis'), 'L3 harus menyertakan Note over Redis untuk Key dan TTL');
+  assert.ok(resL3.fixedMermaid.includes('Note over Ctrl,S3'), 'L3 harus menyertakan Note over S3');
+});
+
 console.log(`\n========================================`);
 console.log(`📊 Hasil Pengujian: ${passedTests} / ${totalTests} lulus.`);
 if (passedTests === totalTests) {

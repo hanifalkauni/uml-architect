@@ -45,8 +45,8 @@ export class ValidatorEngine {
       }
 
       if (isSequence) {
-        // Deteksi blok buka/tutup di sequence diagram
-        if (/^\s*(?:alt|opt|loop|par|critical|break)\b/.test(trimmed)) {
+        // Deteksi blok buka/tutup di sequence diagram (termasuk box untuk visual layer grouping)
+        if (/^\s*(?:box|alt|opt|loop|par|critical|break)\b/.test(trimmed)) {
           blockStack.push(trimmed.split(/\s+/)[0]);
         } else if (/^\s*end\b/.test(trimmed)) {
           if (blockStack.length > 0) {
@@ -70,9 +70,9 @@ export class ValidatorEngine {
           line = `${prefix}${msg}`;
         }
 
-        // Perbaiki participant alias jika mengandung karakter ilegal
+        // Perbaiki participant / actor alias jika mengandung karakter ilegal
         // participant /api/v1 as Endpoint -> participant API as /api/v1
-        const partMatch = line.match(/^(\s*participant\s+)([^as\s]+)(\s+as\s+.*)$/);
+        const partMatch = line.match(/^(\s*(?:participant|actor)\s+)([^as\s]+)(\s+as\s+.*)$/);
         if (partMatch && /[^a-zA-Z0-9_]/.test(partMatch[2])) {
           const cleanAlias = partMatch[2].replace(/[^a-zA-Z0-9_]/g, '_');
           line = `${partMatch[1]}${cleanAlias}${partMatch[3]}`;

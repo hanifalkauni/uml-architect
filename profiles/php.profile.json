@@ -26,11 +26,53 @@
   "database": {
     "ormTriggers": ["Illuminate\\Database\\Eloquent", "Doctrine\\ORM"],
     "queryMethods": [
-      "find", "findOrFail", "first", "where", "create", "save", "update", "delete", "get"
+      "find", "findOrFail", "first", "firstOrFail", "where", "create", "save", "update", "delete", "get"
     ]
   },
   "externalCalls": [
     "Http::(get|post|put|delete|withHeaders)\\(",
-    "GuzzleHttp\\Client"
-  ]
+    "GuzzleHttp\\\\Client"
+  ],
+  "infrastructureRecognition": {
+    "cache": {
+      "patterns": [
+        "Redis::(hget|hset|hdel|get|set|expire|ttl)",
+        "Cache::(get|put|remember|forget|tags)"
+      ],
+      "participant": {
+        "id": "Redis",
+        "alias": "Redis Cache",
+        "type": "database",
+        "layer": "Persistence & Cache Layer"
+      }
+    },
+    "cloud_storage": {
+      "patterns": [
+        "S3Helper",
+        "Storage::disk\\(['\"]s3['\"]\\)",
+        "Aws\\\\S3\\\\S3Client",
+        "getObjectContent",
+        "get_image_presign_url"
+      ],
+      "participant": {
+        "id": "S3",
+        "alias": "S3Helper (AWS S3)",
+        "type": "cloud",
+        "layer": "Cloud Storage"
+      }
+    },
+    "authentication": {
+      "patterns": [
+        "Auth::user\\(",
+        "auth\\(\\)->user\\(",
+        "request->user\\("
+      ],
+      "participant": {
+        "id": "Auth",
+        "alias": "Auth Service",
+        "type": "service",
+        "layer": "Application Layer"
+      }
+    }
+  }
 }
