@@ -135,13 +135,19 @@ Agent akan menelusuri kode, memvalidasi sintaks, dan menyajikan diagram secara i
 ### 📄 Metode B: Pure Skill Agent / Rule File (Tanpa Butuh Node.js Sama Sekali)
 Jika Anda **tidak menjalankan Node.js** sebagai server background MCP di komputer, Anda tetap bisa menggunakan UML-Architect dengan **akurasi 100%** cukup dengan memasang file rule/skill sesuai IDE yang Anda pakai ke dalam proyek:
 
-#### ⚡ Opsi 1: Pemasangan Otomatis via CLI
+#### 🌐 Opsi 1: Otomatis via skills.sh (Direkomendasikan — 30+ AI Agent)
+Pasang langsung ke Cursor, Claude Code, Windsurf, Copilot, atau Gemini CLI hanya dengan 1 perintah:
+```bash
+npx skills add hanifalkauni/uml-architect
+```
+
+#### ⚡ Opsi 2: Pemasangan Otomatis via CLI
 Jalankan perintah ini di root repositori proyek target untuk mengekspor seluruh adapter IDE secara otomatis:
 ```bash
 npx -y github:hanifalkauni/uml-architect init
 ```
 
-#### 📦 Opsi 2: Pemasangan Manual per AI Agent
+#### 📦 Opsi 3: Pemasangan Manual per AI Agent
 
 <details>
 <summary><b>🤖 Google Antigravity & Gemini CLI</b></summary>

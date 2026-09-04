@@ -135,13 +135,19 @@ The agent autonomously traces your codebase, validates the syntax, and renders t
 ### 📄 Method B: Pure Skill Agent / Rule File (No Node.js Required)
 If you don't have Node.js running as an MCP background daemon, you can still use UML-Architect with **100% fidelity** by adding the rule/skill adapter directly into your project:
 
-#### ⚡ Option 1: Automatic Adapter Injection via CLI
+#### 🌐 Option 1: Automatic via skills.sh (Recommended — 30+ AI Agents)
+Install with a single command directly into Cursor, Claude Code, Windsurf, Copilot, or Gemini CLI:
+```bash
+npx skills add hanifalkauni/uml-architect
+```
+
+#### ⚡ Option 2: Automatic Adapter Injection via CLI
 Run this command in any target project root to export all agent adapters automatically:
 ```bash
 npx -y github:hanifalkauni/uml-architect init
 ```
 
-#### 📦 Option 2: Manual Installation per AI Agent
+#### 📦 Option 3: Manual Installation per AI Agent
 
 <details>
 <summary><b>🤖 Google Antigravity & Gemini CLI</b></summary>
