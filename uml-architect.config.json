@@ -23,7 +23,8 @@
     "windsurf": true,
     "copilot": true,
     "cline": true,
-    "kiro": true
+    "kiro": true,
+    "continue": true
   },
   "output": {
     "directory": "docs/diagrams",
