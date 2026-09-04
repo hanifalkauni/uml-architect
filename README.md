@@ -118,6 +118,7 @@ If you don't have Node.js installed on your machine, you can still use UML-Archi
 * **Windsurf**: Copy [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) to `.windsurfrules`
 * **GitHub Copilot**: Copy [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) to `.github/copilot-instructions.md`
 * **Roo Code / Cline**: Copy [`adapters/cline/.clinerules`](adapters/cline/.clinerules) to `.clinerules`
+* **Continue.dev**: Copy [`adapters/continue/uml-architect.md`](adapters/continue/uml-architect.md) to `.continue/rules/uml-architect.md`
 
 Your AI Agent will read the rule file and analyze your codebase directly using its native intelligence—**zero installation needed!**
 

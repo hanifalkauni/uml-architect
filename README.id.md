@@ -74,6 +74,7 @@ Jika Anda **tidak memiliki Node.js** di komputer, Anda tetap bisa menggunakan UM
 * **Windsurf**: Salin [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) ke `.windsurfrules`
 * **GitHub Copilot**: Salin [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) ke `.github/copilot-instructions.md`
 * **Roo Code / Cline**: Salin [`adapters/cline/.clinerules`](adapters/cline/.clinerules) ke `.clinerules`
+* **Continue.dev**: Salin [`adapters/continue/uml-architect.md`](adapters/continue/uml-architect.md) ke `.continue/rules/uml-architect.md`
 
 Asisten AI di IDE Anda akan langsung membaca aturan tersebut dan menganalisis kode Anda menggunakan kecerdasan internalnya—**100% tanpa instalasi apa pun!**
 

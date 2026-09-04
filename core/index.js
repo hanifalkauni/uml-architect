@@ -157,6 +157,7 @@ export class UmlArchitect {
       { src: 'copilot/copilot-instructions.md', dest: '.github/copilot-instructions.md' },
       { src: 'cline/.clinerules', dest: '.clinerules' },
       { src: 'continue/config.json', dest: '.continue/config.json' },
+      { src: 'continue/uml-architect.md', dest: '.continue/rules/uml-architect.md' },
       { src: 'kiro/uml-architect.md', dest: '.kiro/steering/uml-architect.md' },
       { src: 'kiro/config.json', dest: '.kiro/config.json' }
     ];
