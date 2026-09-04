@@ -2,7 +2,7 @@
 ## UML-Architect: Universal Autonomous Code-to-Diagram Skill Agent
 
 * **Product Name**: UML-Architect (Universal Code-to-UML Skill Agent)
-* **Version**: 1.1.0-universal
+* **Version**: 1.0.0-universal
 * **Status**: Proposed / In Review
 * **Target Platforms**: Universal Agent Ecosystem — Google Antigravity IDE, Cursor, Claude Code, Windsurf, GitHub Copilot / VS Code, Roo Code, Cline, Continue.dev, Aider, dan Standalone MCP Server / CLI.
 * **Target Languages**: **100% Polyglot / Language-Agnostic** (TypeScript/JavaScript, Python, Go, Java, Kotlin, C#, Rust, PHP, Ruby, C/C++, Swift, Scala, Elixir, Dart, Zig, Solidity, etc.).

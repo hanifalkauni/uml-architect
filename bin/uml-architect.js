@@ -8,7 +8,7 @@ const args = process.argv.slice(2);
 
 function printHelp() {
   console.log(`
-UML-Architect (v1.1.0) - Universal Autonomous Code-to-Diagram AI Skill Agent
+UML-Architect (v1.0.0) - Universal Autonomous Code-to-Diagram AI Skill Agent
 
 Penggunaan:
   npx uml-architect <command> [options]
@@ -48,7 +48,7 @@ async function main() {
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    console.log('uml-architect v1.1.0');
+    console.log('uml-architect v1.0.0');
     process.exit(0);
   }
 

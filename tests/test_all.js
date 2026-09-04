@@ -40,7 +40,7 @@ async function runAsyncTest(name, fn) {
   }
 }
 
-console.log('\n🧪 Menjalankan Test Suite UML-Architect (v1.1.0)...\n');
+console.log('\n🧪 Menjalankan Test Suite UML-Architect (v1.0.0)...\n');
 
 // 1. Test ManifestSniffer
 runTest('ManifestSniffer: Deteksi bahasa dari ekstensi file', () => {

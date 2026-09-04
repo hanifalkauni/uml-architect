@@ -81,7 +81,7 @@ Every diagram response **MUST** follow this exact Markdown structure to maintain
 ````markdown
 # UML Diagram: <Target / Endpoint Name>
 
-> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.1.0)*
+> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.0.0)*
 
 ## Diagram Visual
 ```mermaid
