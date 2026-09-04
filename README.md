@@ -74,24 +74,10 @@ graph TB
 
 ## 🚀 Quick Start
 
-### 1. One-Command Setup for your IDE
-Initialize rules and configurations for all detected IDEs in your current project:
-```bash
-npx uml-architect init
-```
+Choose the workflow that fits you best:
 
-### 2. Generate Diagram from API Endpoint
-```bash
-npx uml-architect trace --endpoint "POST /api/v1/orders/checkout"
-```
-
-### 3. Generate Diagram from Function
-```bash
-npx uml-architect function --name "processPayment" --file "src/services/payment.ts"
-```
-
-### 4. Run as MCP Server (Model Context Protocol)
-Add this to your IDE's MCP settings (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, etc.) to run directly from GitHub without cloning:
+### 💬 Option 1: AI Agent Chat (Simplest & Recommended — Zero Commands)
+Add UML-Architect directly to your AI IDE (Cursor, Claude Desktop, Google Antigravity, Windsurf, Kiro, Continue.dev, etc.) via MCP:
 ```json
 {
   "mcpServers": {
@@ -102,7 +88,28 @@ Add this to your IDE's MCP settings (Cursor, Claude Desktop, Antigravity, Windsu
   }
 }
 ```
-*(Or use `node ./bin/uml-architect.js --mcp` if running locally)*
+
+Now simply prompt your AI assistant naturally in chat:
+> *"@uml-architect generate a sequence diagram for `POST /api/v1/orders/checkout`"*  
+> *(or: "show me the execution flowchart for `processPayment()`")*
+
+The agent autonomously traces your codebase, validates the syntax, and renders the diagram—**no terminal commands needed!**
+
+---
+
+### 💻 Option 2: Terminal CLI (For Scripts, CI/CD, or Standalone Use)
+Generate diagrams directly from your command line:
+```bash
+# Trace an API endpoint
+npx -y github:hanifalkauni/uml-architect trace --endpoint "POST /api/v1/orders/checkout"
+
+# Trace a specific function
+npx -y github:hanifalkauni/uml-architect function --name "processPayment" --file "src/services/payment.ts"
+
+# (Optional) Inject IDE rule adapters into your project
+npx -y github:hanifalkauni/uml-architect init
+```
+*(Or use `node ./bin/uml-architect.js --mcp` if developing locally)*
 
 ---
 

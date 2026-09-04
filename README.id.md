@@ -30,24 +30,10 @@
 
 ## 🚀 Panduan Cepat
 
-### 1. Inisialisasi Adapter IDE Proyek
-Pasang aturan dan adapter secara otomatis untuk IDE yang aktif di proyek:
-```bash
-npx uml-architect init
-```
+Pilih alur kerja yang paling nyaman bagi Anda:
 
-### 2. Membuat Diagram dari Endpoint API
-```bash
-npx uml-architect trace --endpoint "POST /api/v1/orders/checkout"
-```
-
-### 3. Membuat Diagram dari Fungsi/Method
-```bash
-npx uml-architect function --name "processPayment" --file "src/services/payment.ts"
-```
-
-### 4. Menjalankan Server MCP (Model Context Protocol)
-Tambahkan ke konfigurasi MCP di IDE Anda (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, dll.) untuk dijalankan langsung dari GitHub tanpa clone:
+### 💬 Opsi 1: Chat Langsung di AI IDE (Paling Simpel — Tanpa Perintah Terminal)
+Cukup pasang UML-Architect sekali saja ke pengaturan MCP IDE Anda (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, Continue.dev, dll.):
 ```json
 {
   "mcpServers": {
@@ -58,7 +44,52 @@ Tambahkan ke konfigurasi MCP di IDE Anda (Cursor, Claude Desktop, Antigravity, W
   }
 }
 ```
+
+Setelah itu, Anda cukup menyuruh asisten AI langsung di kolom chat:
+> *"@uml-architect buatkan sequence diagram untuk `POST /api/v1/orders/checkout`"*  
+> *(atau: "gambarkan alur logika fungsi `processPayment()`")*
+
+Agent akan menelusuri kode, memvalidasi sintaks, dan menyajikan diagram secara instan—**tanpa perlu mengetik perintah terminal apa pun!**
+
+---
+
+### 💻 Opsi 2: Lewat Terminal CLI (Untuk Skrip, CI/CD, atau Penggunaan Mandiri)
+Buat diagram langsung dari terminal:
+```bash
+# Analisis alur dari endpoint API
+npx -y github:hanifalkauni/uml-architect trace --endpoint "POST /api/v1/orders/checkout"
+
+# Analisis alur dari fungsi tertentu
+npx -y github:hanifalkauni/uml-architect function --name "processPayment" --file "src/services/payment.ts"
+
+# (Opsional) Pasang adapter rule ke workspace proyek
+npx -y github:hanifalkauni/uml-architect init
+```
 *(Atau gunakan `node ./bin/uml-architect.js --mcp` jika dijalankan secara lokal)*
+
+---
+
+## 📊 Contoh Output Visual
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Frontend Client
+    participant Ctrl as OrderController
+    participant PayGW as PaymentGateway (Stripe API)
+    participant DB as PostgreSQL Database
+
+    Client->>Ctrl: POST /api/orders/checkout {userId, items}
+    alt Item Keranjang Kosong
+        Ctrl-->>Client: 400 Bad Request ("Cart is empty")
+    else Keranjang Valid (Happy Path)
+        Ctrl->>PayGW: POST /v1/charges {amount}
+        PayGW-->>Ctrl: 200 OK {transactionId}
+        Ctrl->>DB: UPDATE orders SET status = 'PAID'
+        DB-->>Ctrl: 1 row affected
+        Ctrl-->>Client: 201 Created {orderId}
+    end
+```
 
 ---
 
