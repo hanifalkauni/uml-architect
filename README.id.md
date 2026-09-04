@@ -47,17 +47,18 @@ npx uml-architect function --name "processPayment" --file "src/services/payment.
 ```
 
 ### 4. Menjalankan Server MCP (Model Context Protocol)
-Tambahkan ke konfigurasi MCP di IDE Anda:
+Tambahkan ke konfigurasi MCP di IDE Anda (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, dll.) untuk dijalankan langsung dari GitHub tanpa clone:
 ```json
 {
   "mcpServers": {
     "uml-architect": {
-      "command": "node",
-      "args": ["c:/MyProject/skill-agent/uml-architect/bin/uml-architect.js", "--mcp"]
+      "command": "npx",
+      "args": ["-y", "github:hanifalkauni/uml-architect", "--mcp"]
     }
   }
 }
 ```
+*(Atau gunakan `node ./bin/uml-architect.js --mcp` jika dijalankan secara lokal)*
 
 ---
 

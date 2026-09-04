@@ -91,17 +91,18 @@ npx uml-architect function --name "processPayment" --file "src/services/payment.
 ```
 
 ### 4. Run as MCP Server (Model Context Protocol)
-Add this to your IDE's MCP settings:
+Add this to your IDE's MCP settings (Cursor, Claude Desktop, Antigravity, Windsurf, Kiro, etc.) to run directly from GitHub without cloning:
 ```json
 {
   "mcpServers": {
     "uml-architect": {
-      "command": "node",
-      "args": ["c:/MyProject/skill-agent/uml-architect/bin/uml-architect.js", "--mcp"]
+      "command": "npx",
+      "args": ["-y", "github:hanifalkauni/uml-architect", "--mcp"]
     }
   }
 }
 ```
+*(Or use `node ./bin/uml-architect.js --mcp` if running locally)*
 
 ---
 

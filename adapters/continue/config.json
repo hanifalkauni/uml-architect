@@ -3,9 +3,10 @@
   "mcpServers": [
     {
       "name": "uml-architect",
-      "command": "node",
+      "command": "npx",
       "args": [
-        "c:/MyProject/skill-agent/uml-architect/bin/uml-architect.js",
+        "-y",
+        "github:hanifalkauni/uml-architect",
         "--mcp"
       ]
     }
