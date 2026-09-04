@@ -129,14 +129,21 @@ export class McpServer {
   async handleRequest(req) {
     const { id, method, params } = req;
 
+    // JSON-RPC 2.0 Specification: Server MUST NOT reply to notifications (requests without id)
+    if (id === undefined || id === null || (typeof method === 'string' && (method.startsWith('notifications/') || method.startsWith('$/')))) {
+      return null;
+    }
+
     if (method === 'initialize') {
       return {
         jsonrpc: '2.0',
         id,
         result: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: params?.protocolVersion || '2024-11-05',
           capabilities: {
-            tools: {}
+            tools: {
+              listChanged: false
+            }
           },
           serverInfo: {
             name: 'uml-architect',
@@ -144,10 +151,6 @@ export class McpServer {
           }
         }
       };
-    }
-
-    if (method === 'notifications/initialized') {
-      return null;
     }
 
     if (method === 'tools/list') {
