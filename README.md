@@ -133,16 +133,98 @@ The agent autonomously traces your codebase, validates the syntax, and renders t
 ---
 
 ### 📄 Method B: Pure Skill Agent / Rule File (No Node.js Required)
-If you don't have Node.js installed on your machine, you can still use UML-Architect with **100% fidelity** by simply copying the rule file for your IDE into your project:
+If you don't have Node.js running as an MCP background daemon, you can still use UML-Architect with **100% fidelity** by adding the rule/skill adapter directly into your project:
 
-* **Google Antigravity**: Copy [`SKILL.md`](SKILL.md) to `.agents/skills/uml-architect/SKILL.md`
-* **Cursor**: Copy [`adapters/cursor/uml-architect.mdc`](adapters/cursor/uml-architect.mdc) to `.cursor/rules/uml-architect.mdc`
-* **Kiro**: Copy [`adapters/kiro/uml-architect.md`](adapters/kiro/uml-architect.md) to `.kiro/steering/uml-architect.md`
-* **Claude Code**: Copy [`adapters/claude/CLAUDE.md`](adapters/claude/CLAUDE.md) to `CLAUDE.md`
-* **Windsurf**: Copy [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) to `.windsurfrules`
-* **GitHub Copilot**: Copy [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) to `.github/copilot-instructions.md`
-* **Roo Code / Cline**: Copy [`adapters/cline/.clinerules`](adapters/cline/.clinerules) to `.clinerules`
-* **Continue.dev**: Copy [`adapters/continue/uml-architect.md`](adapters/continue/uml-architect.md) to `.continue/rules/uml-architect.md`
+#### ⚡ Option 1: Automatic Adapter Injection via CLI
+Run this command in any target project root to export all agent adapters automatically:
+```bash
+npx -y github:hanifalkauni/uml-architect init
+```
+
+#### 📦 Option 2: Manual Installation per AI Agent
+
+<details>
+<summary><b>🤖 Google Antigravity & Gemini CLI</b></summary>
+
+Copy adapter to local workspace skill directory:
+```bash
+mkdir -p .agents/skills/uml-architect
+cp adapters/antigravity/SKILL.md .agents/skills/uml-architect/SKILL.md
+```
+*Or install globally for all workspaces at:* `~/.gemini/config/skills/uml-architect/SKILL.md`.
+</details>
+
+<details>
+<summary><b>💻 Cursor IDE</b></summary>
+
+Copy rules to your Cursor directory:
+```bash
+mkdir -p .cursor/rules
+cp adapters/cursor/uml-architect.mdc .cursor/rules/uml-architect.mdc
+```
+</details>
+
+<details>
+<summary><b>⚡ Kiro AI IDE (kiro.dev)</b></summary>
+
+Copy steering file and MCP configuration to your Kiro project:
+```bash
+mkdir -p .kiro/steering
+cp adapters/kiro/uml-architect.md .kiro/steering/uml-architect.md
+# (Optional) For MCP mode in Kiro:
+cp adapters/kiro/config.json .kiro/config.json
+```
+</details>
+
+<details>
+<summary><b>🧠 Anthropic Claude Code & Claude Desktop</b></summary>
+
+Copy instructions to your project root:
+```bash
+cp adapters/claude/CLAUDE.md ./CLAUDE.md
+```
+*For Claude Desktop, configure the MCP server using Method A above.*
+</details>
+
+<details>
+<summary><b>🏄 Windsurf Cascade</b></summary>
+
+Copy rules to your repository root:
+```bash
+cp adapters/windsurf/.windsurfrules ./.windsurfrules
+```
+</details>
+
+<details>
+<summary><b>🐙 GitHub Copilot & VS Code</b></summary>
+
+Copy instructions to your GitHub configuration directory:
+```bash
+mkdir -p .github
+cp adapters/copilot/copilot-instructions.md .github/copilot-instructions.md
+```
+</details>
+
+<details>
+<summary><b>🤖 Roo Code & Cline</b></summary>
+
+Copy rules to your project root:
+```bash
+cp adapters/cline/.clinerules ./.clinerules
+```
+</details>
+
+<details>
+<summary><b>⏩ Continue.dev</b></summary>
+
+Copy rules and configuration to your Continue directory:
+```bash
+mkdir -p .continue/rules
+cp adapters/continue/uml-architect.md .continue/rules/uml-architect.md
+# (Optional) For MCP mode in Continue:
+cp adapters/continue/config.json .continue/config.json
+```
+</details>
 
 Your AI Agent will read the rule file and analyze your codebase directly using its native intelligence—**zero installation needed!**
 

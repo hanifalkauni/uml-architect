@@ -133,16 +133,98 @@ Agent akan menelusuri kode, memvalidasi sintaks, dan menyajikan diagram secara i
 ---
 
 ### 📄 Metode B: Pure Skill Agent / Rule File (Tanpa Butuh Node.js Sama Sekali)
-Jika Anda **tidak memiliki Node.js** di komputer, Anda tetap bisa menggunakan UML-Architect dengan **akurasi 100%** cukup dengan menyalin file rule sesuai IDE yang Anda pakai ke dalam folder proyek Anda:
+Jika Anda **tidak menjalankan Node.js** sebagai server background MCP di komputer, Anda tetap bisa menggunakan UML-Architect dengan **akurasi 100%** cukup dengan memasang file rule/skill sesuai IDE yang Anda pakai ke dalam proyek:
 
-* **Google Antigravity**: Salin [`SKILL.md`](SKILL.md) ke `.agents/skills/uml-architect/SKILL.md`
-* **Cursor**: Salin [`adapters/cursor/uml-architect.mdc`](adapters/cursor/uml-architect.mdc) ke `.cursor/rules/uml-architect.mdc`
-* **Kiro**: Salin [`adapters/kiro/uml-architect.md`](adapters/kiro/uml-architect.md) ke `.kiro/steering/uml-architect.md`
-* **Claude Code**: Salin [`adapters/claude/CLAUDE.md`](adapters/claude/CLAUDE.md) ke `CLAUDE.md`
-* **Windsurf**: Salin [`adapters/windsurf/.windsurfrules`](adapters/windsurf/.windsurfrules) ke `.windsurfrules`
-* **GitHub Copilot**: Salin [`adapters/copilot/copilot-instructions.md`](adapters/copilot/copilot-instructions.md) ke `.github/copilot-instructions.md`
-* **Roo Code / Cline**: Salin [`adapters/cline/.clinerules`](adapters/cline/.clinerules) ke `.clinerules`
-* **Continue.dev**: Salin [`adapters/continue/uml-architect.md`](adapters/continue/uml-architect.md) ke `.continue/rules/uml-architect.md`
+#### ⚡ Opsi 1: Pemasangan Otomatis via CLI
+Jalankan perintah ini di root repositori proyek target untuk mengekspor seluruh adapter IDE secara otomatis:
+```bash
+npx -y github:hanifalkauni/uml-architect init
+```
+
+#### 📦 Opsi 2: Pemasangan Manual per AI Agent
+
+<details>
+<summary><b>🤖 Google Antigravity & Gemini CLI</b></summary>
+
+Salin adapter ke direktori skill workspace lokal Anda:
+```bash
+mkdir -p .agents/skills/uml-architect
+cp adapters/antigravity/SKILL.md .agents/skills/uml-architect/SKILL.md
+```
+*Atau pasang secara global untuk seluruh proyek di:* `~/.gemini/config/skills/uml-architect/SKILL.md`.
+</details>
+
+<details>
+<summary><b>💻 Cursor IDE</b></summary>
+
+Salin rules ke direktori Cursor Anda:
+```bash
+mkdir -p .cursor/rules
+cp adapters/cursor/uml-architect.mdc .cursor/rules/uml-architect.mdc
+```
+</details>
+
+<details>
+<summary><b>⚡ Kiro AI IDE (kiro.dev)</b></summary>
+
+Salin berkas steering dan konfigurasi MCP ke proyek Kiro Anda:
+```bash
+mkdir -p .kiro/steering
+cp adapters/kiro/uml-architect.md .kiro/steering/uml-architect.md
+# (Opsional) Jika menggunakan mode MCP di Kiro:
+cp adapters/kiro/config.json .kiro/config.json
+```
+</details>
+
+<details>
+<summary><b>🧠 Anthropic Claude Code & Claude Desktop</b></summary>
+
+Salin instruksi ke root proyek Anda:
+```bash
+cp adapters/claude/CLAUDE.md ./CLAUDE.md
+```
+*Untuk Claude Desktop, pasang konfigurasi MCP menggunakan Metode A di atas.*
+</details>
+
+<details>
+<summary><b>🏄 Windsurf Cascade</b></summary>
+
+Salin rules ke root repositori Anda:
+```bash
+cp adapters/windsurf/.windsurfrules ./.windsurfrules
+```
+</details>
+
+<details>
+<summary><b>🐙 GitHub Copilot & VS Code</b></summary>
+
+Salin instruksi ke direktori konfigurasi GitHub:
+```bash
+mkdir -p .github
+cp adapters/copilot/copilot-instructions.md .github/copilot-instructions.md
+```
+</details>
+
+<details>
+<summary><b>🤖 Roo Code & Cline</b></summary>
+
+Salin rules ke root repositori Anda:
+```bash
+cp adapters/cline/.clinerules ./.clinerules
+```
+</details>
+
+<details>
+<summary><b>⏩ Continue.dev</b></summary>
+
+Salin rules dan konfigurasi ke direktori Continue Anda:
+```bash
+mkdir -p .continue/rules
+cp adapters/continue/uml-architect.md .continue/rules/uml-architect.md
+# (Opsional) Jika menggunakan mode MCP di Continue:
+cp adapters/continue/config.json .continue/config.json
+```
+</details>
 
 Asisten AI di IDE Anda akan langsung membaca aturan tersebut dan menganalisis kode Anda menggunakan kecerdasan internalnya—**100% tanpa instalasi apa pun!**
 
