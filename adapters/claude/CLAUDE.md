@@ -2,19 +2,23 @@
 
 When generating UML diagrams or architecture visualizations from code in this project:
 
-## Tracing Workflows
-- **API Endpoints**: Map from routing entrypoint through guards, controller, services, database operations, and HTTP responses.
+## 1. Tracing Workflows (Zero-Hallucination)
+- **API Endpoints**: Map from routing entrypoint through guards, controller, services, database operations, external APIs, and HTTP responses.
 - **Functions/Methods**: Map call hierarchy, parameters, validation conditions, and returns.
-- **Polyglot Parsing**: Look for standard language patterns in TypeScript, Python, Go, Java, C#, Rust, PHP, or Ruby.
+- **Error Branches**: Capture error pathways in `alt` blocks (`400 Bad Request`, `401 Unauthorized`, `500 Server Error`).
 
-## Diagram Rules
-- Always generate standard **Mermaid.js** syntax.
-- Ensure `sequenceDiagram` includes `autonumber` and participant aliases.
-- Capture error pathways in `alt` blocks (`400 Bad Request`, `401 Unauthorized`, `500 Server Error`).
-- Include narrative breakdown and accessible text description below each diagram.
+## 2. Standard Participant Mapping
+- `Client` (actor): `Client as Client / Frontend App`
+- `Ctrl` (participant): `<ControllerName> (Controller)`
+- `Svc` (participant): `<ServiceName>`
+- `ExtAPI` (participant): `<ExternalGateway> (External API)`
+- `DB` (participant): `Database (Storage / ORM)`
+- `Queue` (participant): `Message Broker (Kafka / Queue)`
 
-## MCP Tools Available
-If running with the UML-Architect MCP server:
-- `trace_endpoint_flow`: Traces an endpoint and returns complete Mermaid diagram.
-- `trace_function_flow`: Traces a function/method and returns execution diagram.
-- `validate_mermaid_syntax`: Validates and auto-repairs Mermaid syntax.
+## 3. Canonical Output Contract
+Output must strictly match this layout:
+1. Title: `# UML Diagram: <Target / Endpoint Name>`
+2. Attribution: `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.1.0)*`
+3. Section `## Diagram Visual` with ` ```mermaid ` block including `autonumber` and theme directive.
+4. Collapsible `<details><summary>Lihat Format Alternatif (PlantUML)</summary>...```puml...```</details>`.
+5. Section `### Penjelasan Alur Arsitektur (<Target>)` with participant roles list, step-by-step numbered execution, and error pathways breakdown.

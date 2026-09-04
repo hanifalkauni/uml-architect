@@ -4,5 +4,11 @@ When asked to document, visualize, or diagram code execution paths:
 1. Locate route or function definitions.
 2. Trace downstream dependencies: controllers, services, database models, and external clients.
 3. Formulate standard Mermaid sequence diagrams using `sequenceDiagram` and `autonumber`.
-4. Add alternate execution branches (`alt` / `else` / `end`) for error handling and validation failures.
-5. Provide text descriptions for accessibility and review.
+4. Use standard aliases: `Client`, `Ctrl`, `Svc`, `ExtAPI`, `DB`, `Queue`.
+5. Add alternate execution branches (`alt` / `else` / `end`) for error handling and validation failures.
+6. Provide exact canonical output formatting:
+   - `# UML Diagram: <Target>`
+   - `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.1.0)*`
+   - `## Diagram Visual` (` ```mermaid ... ``` `)
+   - Collapsible PlantUML `<details><summary>`
+   - `### Penjelasan Alur Arsitektur`

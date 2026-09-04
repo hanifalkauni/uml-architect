@@ -16,11 +16,90 @@ When user asks to generate UML diagrams, sequence flows, or architecture documen
 - **Error Pathways**: Always identify `try/catch`, `if err != nil`, and error returns. Map them to `alt` / `opt` blocks.
 - **Verification**: Only include classes, methods, and actors that actually exist in the source code.
 
-## 3. Mermaid Syntax Standards
-- Always output valid Mermaid.js inside standard fenced blocks: ` ```mermaid ... ``` `.
-- For sequence diagrams, always include `sequenceDiagram`, `autonumber`, and explicit participant aliases (`participant Ctrl as OrderController`).
-- Provide alternative PlantUML syntax inside `<details><summary>` tags.
+## 3. Standard Participant ID & Alias Scheme
+- `Client` (actor): `Client as Client / Frontend App`
+- `Ctrl` (participant): `<ControllerName> (Controller)`
+- `Svc` (participant): `<ServiceName>`
+- `ExtAPI` (participant): `<ExternalGateway> (External API)`
+- `DB` (participant): `Database (Storage / ORM)`
+- `Queue` (participant): `Message Broker (Kafka / Queue)`
 
-## 4. Accessibility & Narrative Explanation
-- Follow WCAG 2.2 AA standards by providing an accessible, step-by-step narrative explanation under every diagram.
-- Summarize actors, input payloads, status responses, and error conditions.
+## 4. Exact Canonical Output Contract
+Always format responses to match this exact output contract:
+
+````markdown
+# UML Diagram: <Target / Endpoint Name>
+
+> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.1.0)*
+
+## Diagram Visual
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#7aa2f7', 'primaryBorderColor': '#3d59a1', 'actorBkg': '#24283b', 'actorBorder': '#7aa2f7', 'lineColor': '#bb9af7', 'altBkg': '#1f2335' }}}%%
+sequenceDiagram
+    autonumber
+    actor Client as Client / Frontend App
+    participant Ctrl as <ControllerName> (Controller)
+    participant Svc as <ServiceName>
+    participant DB as Database (Storage / ORM)
+    participant Queue as Message Broker (Kafka / Queue)
+
+    Client->>Ctrl: <HTTP_METHOD> <URL_PATH>
+    alt Validasi Input / Auth Gagal
+        Ctrl-->>Client: 400 Bad Request / 401 Unauthorized
+    else Validasi Lolos (Happy Path)
+        Ctrl->>Svc: processRequest(payload)
+        Svc->>DB: Save / Query Transaction Record
+        DB-->>Svc: DB Commit Success
+        Ctrl-)Queue: publish("event.completed", payload)
+        Ctrl-->>Client: 200 OK / 201 Created (Success Payload)
+    end
+```
+
+<details>
+<summary>Lihat Format Alternatif (PlantUML)</summary>
+
+```puml
+@startuml
+autonumber
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+actor "Client / Frontend App" as Client
+participant "<ControllerName> (Controller)" as Ctrl
+participant "<ServiceName>" as Svc
+participant "Database (Storage / ORM)" as DB
+participant "Message Broker (Kafka / Queue)" as Queue
+
+Client -> Ctrl: <HTTP_METHOD> <URL_PATH>
+alt Validasi Input / Auth Gagal
+Ctrl --> Client: 400 Bad Request / 401 Unauthorized
+else Validasi Lolos (Happy Path)
+Ctrl -> Svc: processRequest(payload)
+Svc -> DB: Save / Query Transaction Record
+DB --> Svc: DB Commit Success
+Ctrl -> Queue: publish("event.completed", payload)
+Ctrl --> Client: 200 OK / 201 Created (Success Payload)
+end
+@enduml
+```
+</details>
+
+### Penjelasan Alur Arsitektur (<Target / Endpoint Name>)
+
+Alur eksekusi ini melibatkan **<N> komponen utama**:
+
+* **Client / Frontend App** (`Client`): Berperan sebagai entitas pengguna/pemanggil.
+* **<ControllerName> (Controller)** (`Ctrl`): Berperan sebagai entitas pengendali request dan respons.
+* **<ServiceName>** (`Svc`): Berperan sebagai penyedia logika bisnis domain.
+* **Database (Storage / ORM)** (`DB`): Berperan sebagai media persistensi data transaksi.
+* **Message Broker (Kafka / Queue)** (`Queue`): Berperan sebagai penerima event asinkron.
+
+#### Rincian Langkah Eksekusi:
+1. **Client** mengirimkan request ke **Ctrl**.
+2. **Ctrl** memvalidasi request dan mendelegasikan ke **Svc**.
+3. **Svc** menjalankan query/mutasi ke **DB**.
+4. **Ctrl** mengembalikan respons sukses HTTP 200/201 ke **Client**.
+
+#### Penanganan Error & Pengecualian (Error Pathways):
+* **ValidationException**: Menghasilkan respons HTTP `400`.
+* **InternalException**: Menghasilkan respons HTTP `500`.
+````
