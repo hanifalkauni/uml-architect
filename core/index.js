@@ -22,6 +22,7 @@ export class UmlArchitect {
 
     this.theme = options.theme || this.config.theme || 'tokyo-night';
     this.detailLevel = options.detailLevel || this.config.detailLevel || 'standard';
+    this.lang = options.lang || options.language || this.config.language || 'en';
 
     this.sniffer = new ManifestSniffer(this.rootDir);
     this.profileLoader = new ProfileLoader();
@@ -29,7 +30,7 @@ export class UmlArchitect {
       rootDir: this.rootDir,
       config: this.config
     });
-    this.synthesizer = new SynthesizerEngine({ theme: this.theme });
+    this.synthesizer = new SynthesizerEngine({ theme: this.theme, lang: this.lang });
     this.validator = new ValidatorEngine();
   }
 

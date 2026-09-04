@@ -8,6 +8,7 @@ import { ValidatorEngine } from './validator.js';
 export class SynthesizerEngine {
   constructor(options = {}) {
     this.theme = options.theme || 'tokyo-night';
+    this.lang = options.lang || options.language || 'en';
     this.validator = new ValidatorEngine();
   }
 
@@ -350,42 +351,71 @@ export class SynthesizerEngine {
   /**
    * Menghasilkan dokumentasi naratif ramah A11y (WCAG 2.2 AA)
    */
-  generateNarrativeWalkthrough(traceData) {
-    const endpoint = traceData.endpoint || 'Endpoint / Function Execution';
+  generateNarrativeWalkthrough(traceData, lang = this.lang) {
+    const isId = lang === 'id';
+    const endpoint = traceData.endpoint || (isId ? 'Eksekusi Endpoint / Fungsi' : 'Endpoint / Function Execution');
+    const participants = traceData.participants || [];
+
     const lines = [
-      `### Penjelasan Alur Arsitektur (${endpoint})`,
+      isId
+        ? `### Penjelasan Alur Arsitektur (${endpoint})`
+        : `### Architecture Execution Walkthrough (${endpoint})`,
       '',
-      `Alur eksekusi ini melibatkan **${(traceData.participants || []).length} komponen utama**:`,
+      isId
+        ? `Alur eksekusi ini melibatkan **${participants.length} komponen utama**:`
+        : `This execution flow involves **${participants.length} primary components**:`,
       ''
     ];
 
-    for (const p of traceData.participants || []) {
+    for (const p of participants) {
       const layerInfo = p.layer ? ` (${p.layer})` : '';
-      lines.push(`* **${p.label}** (\`${p.id}\`)${layerInfo}: Berperan sebagai entitas ${p.type === 'actor' ? 'pengguna/pemanggil' : 'service pelaksana'}.`);
+      if (isId) {
+        lines.push(`* **${p.label}** (\`${p.id}\`)${layerInfo}: Berperan sebagai entitas ${p.type === 'actor' ? 'pengguna/pemanggil' : 'service pelaksana'}.`);
+      } else {
+        lines.push(`* **${p.label}** (\`${p.id}\`)${layerInfo}: Acts as the ${p.type === 'actor' ? 'client/caller entity' : 'execution service'}.`);
+      }
     }
 
     lines.push('');
-    lines.push('#### Rincian Langkah Eksekusi:');
+    lines.push(isId ? '#### Rincian Langkah Eksekusi:' : '#### Detailed Execution Steps:');
 
     let stepNum = 1;
     for (const step of traceData.steps || []) {
       if (!step.type || step.type === 'call') {
-        const action = step.isReturn ? 'mengembalikan hasil ke' : (step.isAsync ? 'mengirim event asinkron ke' : 'memanggil');
+        let action;
+        if (isId) {
+          action = step.isReturn ? 'mengembalikan hasil ke' : (step.isAsync ? 'mengirim event asinkron ke' : 'memanggil');
+        } else {
+          action = step.isReturn ? 'returns result to' : (step.isAsync ? 'dispatches asynchronous event to' : 'calls');
+        }
         lines.push(`${stepNum++}. **${step.from}** ${action} **${step.to}**: \`${step.message}\`.`);
       } else if (step.type === 'alt_start') {
-        lines.push(`   * *Pengecekan Kondisi*: Jika \`${step.condition}\`, aliran beralih ke jalur alternatif.`);
+        lines.push(isId
+          ? `   * *Pengecekan Kondisi*: Jika \`${step.condition}\`, aliran beralih ke jalur alternatif.`
+          : `   * *Condition Check*: If \`${step.condition}\`, flow branches to alternative path.`
+        );
       } else if (step.type === 'alt_else') {
-        lines.push(`   * *Jalur Alternatif / Default*: \`${step.condition}\`.`);
+        lines.push(isId
+          ? `   * *Jalur Alternatif / Default*: \`${step.condition}\`.`
+          : `   * *Alternative / Default Path*: \`${step.condition}\`.`
+        );
       } else if (step.type === 'note') {
-        lines.push(`   * *Catatan Teknis*: ${step.text}`);
+        lines.push(isId
+          ? `   * *Catatan Teknis*: ${step.text}`
+          : `   * *Technical Note*: ${step.text}`
+        );
       }
     }
 
     if (traceData.errorBranches && traceData.errorBranches.length > 0) {
       lines.push('');
-      lines.push('#### Penanganan Error & Pengecualian (Error Pathways):');
+      lines.push(isId ? '#### Penanganan Error & Pengecualian (Error Pathways):' : '#### Error Pathways & Exception Handling:');
       for (const err of traceData.errorBranches) {
-        lines.push(`* **${err.type || 'Exception'}**: Menghasilkan respons HTTP \`${err.status || 500}\` dengan pesan "${err.message || 'Error occurred'}".`);
+        if (isId) {
+          lines.push(`* **${err.type || 'Exception'}**: Menghasilkan respons HTTP \`${err.status || 500}\` dengan pesan "${err.message || 'Error occurred'}".`);
+        } else {
+          lines.push(`* **${err.type || 'Exception'}**: Yields HTTP response \`${err.status || 500}\` with message "${err.message || 'Error occurred'}".`);
+        }
       }
     }
 
@@ -395,7 +425,7 @@ export class SynthesizerEngine {
   /**
    * Merender paket artefak lengkap dalam format Markdown
    */
-  renderFullArtifact(traceData, diagramType = 'sequence') {
+  renderFullArtifact(traceData, diagramType = 'sequence', lang = this.lang) {
     let diagResult;
     if (diagramType === 'flowchart') {
       diagResult = this.generateFlowchart(traceData);
@@ -409,23 +439,30 @@ export class SynthesizerEngine {
       diagResult = this.generateSequenceDiagram(traceData);
     }
 
-    const narrative = this.generateNarrativeWalkthrough(traceData);
+    const narrative = this.generateNarrativeWalkthrough(traceData, lang);
     const title = traceData.endpoint
       ? `UML Diagram: ${traceData.endpoint}`
       : `UML Diagram: ${traceData.targetName || 'Execution Flow'}`;
 
+    const isId = lang === 'id';
+    const badge = isId
+      ? `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.0.0)*`
+      : `> *Automatically generated by **UML-Architect Skill Agent** (v1.0.0)*`;
+    const visualHeader = isId ? '## Diagram Visual' : '## Visual Diagram';
+    const summaryTitle = isId ? 'Lihat Format Alternatif (PlantUML)' : 'View Alternative Format (PlantUML)';
+
     return [
       `# ${title}`,
       '',
-      `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.0.0)*`,
+      badge,
       '',
-      '## Diagram Visual',
+      visualHeader,
       '```mermaid',
       diagResult.fixedMermaid,
       '```',
       '',
       '<details>',
-      '<summary>Lihat Format Alternatif (PlantUML)</summary>',
+      `<summary>${summaryTitle}</summary>`,
       '',
       '```puml',
       this.generatePlantUML(traceData),
