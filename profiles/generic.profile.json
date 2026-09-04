@@ -1,0 +1,37 @@
+{
+  "language": "generic",
+  "displayName": "Generic Polyglot Fallback",
+  "manifestTriggers": [],
+  "extensions": [".*"],
+  "frameworks": {
+    "universal": {
+      "routePatterns": [
+        "(?:get|post|put|delete|patch|options)\\s*\\([\"']([^\"']+)[\"']",
+        "route\\s*\\([\"']([^\"']+)[\"']",
+        "url\\s*\\([\"']([^\"']+)[\"']",
+        "endpoint\\s*[:=]\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "(?:function|def|fn|func|public|private)\\s+([a-zA-Z0-9_]+)\\s*\\(",
+      "middlewarePatterns": ["middleware", "guard", "filter", "interceptor", "auth"],
+      "responsePatterns": ["return\\s+", "response\\.", "send\\(", "reply\\("]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "(?:try|catch|except|rescue|catch_error|err\\s*!=|throw|raise|panic|fail)",
+      "error|err|exception"
+    ],
+    "asyncWorkflow": [
+      "async", "await", "spawn", "go ", "thread", "queue", "event", "publish", "produce"
+    ]
+  },
+  "database": {
+    "ormTriggers": ["sql", "query", "db", "database", "repository", "model", "entity", "table"],
+    "queryMethods": [
+      "select", "insert", "update", "delete", "find", "get", "save", "create", "query", "exec"
+    ]
+  },
+  "externalCalls": [
+    "http", "fetch", "request", "client", "curl", "grpc", "api"
+  ]
+}

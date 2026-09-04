@@ -1,0 +1,13 @@
+{
+  "models": [],
+  "mcpServers": [
+    {
+      "name": "uml-architect",
+      "command": "node",
+      "args": [
+        "c:/MyProject/skill-agent/uml-architect/bin/uml-architect.js",
+        "--mcp"
+      ]
+    }
+  ]
+}

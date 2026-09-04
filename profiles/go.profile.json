@@ -1,0 +1,62 @@
+{
+  "language": "go",
+  "displayName": "Go (Golang)",
+  "manifestTriggers": ["go.mod", "Gopkg.lock", "go.sum"],
+  "extensions": [".go"],
+  "frameworks": {
+    "gin": {
+      "routePatterns": [
+        "(?:r|router|api|grp|v1)\\.(GET|POST|PUT|DELETE|PATCH|OPTIONS)\\s*\\(\\s*[\"']([^\"']+)[\"']",
+        "Group\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "func\\s*(?:\\([^)]+\\))?\\s*([a-zA-Z0-9_]+)?\\s*\\((?:c|ctx)\\s+\\*gin\\.Context\\)",
+      "middlewarePatterns": ["Use\\(", "middleware\\.", "auth\\.", "cors\\."],
+      "responsePatterns": [
+        "(?:c|ctx)\\.JSON\\((\\d+|http\\.[A-Za-z0-9_]+)\\s*,\\s*([^)]*)\\)",
+        "(?:c|ctx)\\.AbortWithStatusJSON\\((\\d+|http\\.[A-Za-z0-9_]+)\\s*,"
+      ]
+    },
+    "fiber": {
+      "routePatterns": [
+        "(?:app|router|api)\\.(Get|Post|Put|Delete|Patch)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "func\\s*\\((?:c|ctx)\\s+\\*fiber\\.Ctx\\)\\s*error",
+      "responsePatterns": ["(?:c|ctx)\\.Status\\((\\d+)\\)\\.JSON\\(([^)]*)\\)"]
+    },
+    "echo": {
+      "routePatterns": [
+        "(?:e|echo|g)\\.(GET|POST|PUT|DELETE|PATCH)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "func\\s*\\((?:c|ctx)\\s+echo\\.Context\\)\\s*error",
+      "responsePatterns": ["(?:c|ctx)\\.JSON\\((\\d+)\\s*,\\s*([^)]*)\\)"]
+    },
+    "chi": {
+      "routePatterns": [
+        "(?:r|router)\\.(Get|Post|Put|Delete|Patch)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "if\\s+err\\s*!=\\s*nil\\s*\\{[^}]*\\}",
+      "panic\\(([^)]*)\\)",
+      "recover\\(\\)"
+    ],
+    "asyncWorkflow": [
+      "go\\s+func\\s*\\(",
+      "go\\s+([a-zA-Z0-9_.]+)\\(",
+      "<-chan|chan<-|make\\(chan"
+    ]
+  },
+  "database": {
+    "ormTriggers": ["gorm.io/gorm", "github.com/jmoiron/sqlx", "database/sql", "entgo.io/ent"],
+    "queryMethods": [
+      "Find", "First", "Take", "Create", "Save", "Updates", "Delete", "Exec", "QueryRow", "Select", "Where"
+    ]
+  },
+  "externalCalls": [
+    "http\\.(?:Get|Post|NewRequestWithContext)",
+    "client\\.Do\\(",
+    "grpc\\.Dial"
+  ]
+}

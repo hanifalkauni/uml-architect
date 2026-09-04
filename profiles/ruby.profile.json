@@ -1,0 +1,36 @@
+{
+  "language": "ruby",
+  "displayName": "Ruby (Rails / Sinatra)",
+  "manifestTriggers": ["Gemfile", "Gemfile.lock"],
+  "extensions": [".rb"],
+  "frameworks": {
+    "rails": {
+      "routePatterns": [
+        "(get|post|put|delete|patch)\\s+[\"']([^\"']+)[\"']\\s*,\\s*to:\\s*[\"']([^\"']+)[\"']",
+        "resources\\s+:([a-zA-Z0-9_]+)"
+      ],
+      "handlerSignature": "def\\s+([a-zA-Z0-9_]+)",
+      "middlewarePatterns": ["before_action\\s+:([a-zA-Z0-9_]+)"],
+      "responsePatterns": ["render\\s+json:\\s*([^,\\n]+)", "head\\s+:([a-zA-Z0-9_]+)"]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "begin[\\s\\S]*?rescue\\s*=>\\s*(\\w+)",
+      "rescue_from\\s+([A-Za-z0-9_:]+)",
+      "raise\\s+([A-Za-z0-9_:]+)"
+    ],
+    "asyncWorkflow": [
+      "perform_async\\(", "perform_later\\("
+    ]
+  },
+  "database": {
+    "ormTriggers": ["ActiveRecord::Base"],
+    "queryMethods": [
+      "find", "find_by", "where", "create!", "save!", "update!", "destroy"
+    ]
+  },
+  "externalCalls": [
+    "Net::HTTP", "Faraday\\.", "HTTParty\\."
+  ]
+}

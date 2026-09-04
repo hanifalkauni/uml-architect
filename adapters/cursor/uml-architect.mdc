@@ -1,0 +1,27 @@
+---
+description: Universal UML Sequence, Flowchart, and Architecture Diagram Generator from Code
+globs: **/*
+alwaysApply: false
+---
+
+# Cursor Rule: UML-Architect
+
+When user asks to generate UML, Sequence Diagrams, Flowcharts, or Architecture Flows from code (endpoint, function, or file path):
+
+1. **Detect Target & Context**:
+   - Determine target endpoint, function, or file.
+   - Sniff project manifest (`package.json`, `go.mod`, `pom.xml`, `pyproject.toml`, `Cargo.toml`, etc.) to understand the active framework.
+
+2. **Trace Call Graph**:
+   - Trace full request lifecycle: Router -> Middleware/Guards -> Controller -> Service -> Repository/ORM -> External APIs -> Queues.
+   - Always trace both happy path and unhappy error paths (`try/catch`, `if err != nil`, validation failures).
+
+3. **Mermaid Generation Standards**:
+   - For Sequence Diagrams: Always include `sequenceDiagram`, `autonumber`, and explicit `participant Alias as Full Name`.
+   - Use `alt` blocks for conditional branches and error responses (e.g. 400 Bad Request, 401 Unauthorized, 500 Error).
+   - Use `par` blocks or dotted arrows for asynchronous/background tasks.
+   - Ensure all labels with special characters (brackets, quotes, slashes) are properly escaped.
+
+4. **Deliverables**:
+   - Output clean Mermaid code block: ` ```mermaid ... ``` `.
+   - Provide a step-by-step narrative explanation under the diagram explaining each transition.

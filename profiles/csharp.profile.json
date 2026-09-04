@@ -1,0 +1,39 @@
+{
+  "language": "csharp",
+  "displayName": "C# (.NET / ASP.NET Core)",
+  "manifestTriggers": [".csproj", ".sln", "global.json"],
+  "extensions": [".cs"],
+  "frameworks": {
+    "aspnet": {
+      "routePatterns": [
+        "\\[Http(Get|Post|Put|Delete|Patch|Options)(?:\\(\\s*[\"']([^\"']*)[\"']\\))?\\]",
+        "\\[Route\\(\\s*[\"']([^\"']*)[\"']\\)\\]",
+        "\\[ApiController\\]"
+      ],
+      "handlerSignature": "public\\s+(?:async\\s+)?Task<(?:IActionResult|ActionResult<[^>]+>)>\\s+([a-zA-Z0-9_]+)\\s*\\(",
+      "middlewarePatterns": ["\\[Authorize(?:\\([^)]*\\))?\\]", "\\[ValidateAntiForgeryToken\\]"],
+      "responsePatterns": ["Ok\\(([^)]*)\\)", "BadRequest\\(([^)]*)\\)", "NotFound\\(([^)]*)\\)", "StatusCode\\((\\d+)"]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "try\\s*\\{[\\s\\S]*?\\}\\s*catch\\s*\\(([A-Za-z0-9_]+)\\s+\\w+\\)",
+      "throw\\s+new\\s+([A-Za-z0-9_]+Exception)\\(([^)]*)\\)"
+    ],
+    "asyncWorkflow": [
+      "await\\s+([a-zA-Z0-9_.]+Async)\\(",
+      "Task\\.Run\\(",
+      "Task\\.WhenAll\\("
+    ]
+  },
+  "database": {
+    "ormTriggers": ["Microsoft.EntityFrameworkCore", "Dapper"],
+    "queryMethods": [
+      "ToListAsync", "FirstOrDefaultAsync", "FindAsync", "AddAsync", "SaveChangesAsync", "Remove"
+    ]
+  },
+  "externalCalls": [
+    "httpClient\\.(?:GetAsync|PostAsync|SendAsync)\\(",
+    "RestSharp"
+  ]
+}

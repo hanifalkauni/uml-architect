@@ -1,0 +1,63 @@
+{
+  "language": "typescript",
+  "displayName": "TypeScript / JavaScript",
+  "manifestTriggers": ["package.json", "tsconfig.json", "jsconfig.json"],
+  "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
+  "frameworks": {
+    "express": {
+      "routePatterns": [
+        "(?:app|router)\\.(get|post|put|delete|patch|options)\\s*\\(\\s*[\"']([^\"']+)[\"']",
+        "route\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*\\)\\s*\\.(get|post|put|delete|patch)"
+      ],
+      "handlerSignature": "(?:async\\s+)?function\\s*\\w*\\s*\\((?:req|request)[^)]*\\)|(?:async\\s*)?\\((?:req|request)[^)]*\\)\\s*=>",
+      "middlewarePatterns": ["app\\.use\\(", "router\\.use\\(", "(?:auth|verify|validate|guard|cors)\\w*"],
+      "responsePatterns": ["res\\.(?:status\\((\\d+)\\)\\.)?(?:json|send|sendStatus)\\(([^)]*)\\)"]
+    },
+    "nestjs": {
+      "routePatterns": [
+        "@(Get|Post|Put|Delete|Patch|Options)\\s*\\(\\s*(?:[\"']([^\"']*)[\"'])?\\s*\\)",
+        "@Controller\\s*\\(\\s*(?:[\"']([^\"']*)[\"'])?\\s*\\)"
+      ],
+      "handlerSignature": "@(Get|Post|Put|Delete|Patch)[\\s\\S]*?\\b(?:async\\s+)?([a-zA-Z0-9_]+)\\s*\\(",
+      "middlewarePatterns": ["@UseGuards\\(([^)]+)\\)", "@UseInterceptors\\(([^)]+)\\)", "@UsePipes\\(([^)]+)\\)"],
+      "responsePatterns": ["return\\s+[^;]+", "throw\\s+new\\s+HttpException\\(([^)]+)\\)"]
+    },
+    "fastify": {
+      "routePatterns": [
+        "(?:fastify|server|app)\\.(get|post|put|delete|patch)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "(?:async\\s+)?\\((?:request|req)[^)]*\\)",
+      "responsePatterns": ["reply\\.(?:status\\((\\d+)\\)\\.)?send\\(([^)]*)\\)"]
+    },
+    "nextjs": {
+      "routePatterns": [
+        "export\\s+(?:async\\s+)?function\\s+(GET|POST|PUT|DELETE|PATCH)\\s*\\(",
+        "\"use server\""
+      ],
+      "responsePatterns": ["NextResponse\\.json\\(([^)]+)\\)", "Response\\.json\\(([^)]+)\\)"]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "try\\s*\\{[\\s\\S]*?\\}\\s*catch\\s*\\(([^)]*)\\)",
+      "throw\\s+new\\s+([A-Za-z0-9_]+Error|HttpException|Error)\\(([^)]*)\\)"
+    ],
+    "asyncWorkflow": [
+      "await\\s+([a-zA-Z0-9_.]+)\\(",
+      "Promise\\.all\\(",
+      "EventEmitter|\\.emit\\([\"']([^\"']+)[\"']"
+    ]
+  },
+  "database": {
+    "ormTriggers": ["@prisma/client", "typeorm", "mongoose", "sequelize", "knex", "drizzle-orm"],
+    "queryMethods": [
+      "findMany", "findUnique", "findFirst", "create", "update", "delete", "upsert",
+      "createQueryBuilder", "save", "findOne", "findById", "aggregate"
+    ]
+  },
+  "externalCalls": [
+    "axios\\.(get|post|put|delete|patch)\\(",
+    "fetch\\([\"']([^\"']+)[\"']",
+    "got\\(", "ky\\."
+  ]
+}

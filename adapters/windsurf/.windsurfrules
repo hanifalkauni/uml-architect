@@ -1,0 +1,8 @@
+# Windsurf Cascade Rules: UML-Architect
+
+When user asks for architecture flows, sequence diagrams, or UML from code:
+1. Identify the target endpoint or function signature.
+2. Read the source code files and follow imported services, repositories, and handlers.
+3. Generate valid Mermaid.js diagrams with clean participant aliases and `autonumber`.
+4. Include validation error paths and exception catches in `alt` blocks.
+5. Provide a clear narrative summary explaining the interaction flow.

@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UmlArchitectConfig",
+  "type": "object",
+  "properties": {
+    "defaultDiagramType": {
+      "type": "string",
+      "enum": ["sequence", "flowchart", "class", "state", "component"],
+      "default": "sequence"
+    },
+    "detailLevel": {
+      "type": "string",
+      "enum": ["high", "standard", "deep", "L1", "L2", "L3"],
+      "default": "standard"
+    },
+    "theme": {
+      "type": "string",
+      "enum": ["tokyo-night", "catppuccin", "nord", "default", "minimalist"],
+      "default": "tokyo-night"
+    },
+    "polyglot": {
+      "type": "object",
+      "properties": {
+        "preferTreeSitter": { "type": "boolean" },
+        "scanSubmodules": { "type": "boolean" },
+        "frameworkHints": { "type": "object" }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "properties": {
+        "antigravity": { "type": "boolean" },
+        "cursor": { "type": "boolean" },
+        "claudeCode": { "type": "boolean" },
+        "windsurf": { "type": "boolean" },
+        "copilot": { "type": "boolean" },
+        "cline": { "type": "boolean" },
+        "kiro": { "type": "boolean" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "directory": { "type": "string" },
+        "format": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["mermaid", "markdown", "puml"] }
+        },
+        "includeNarrativeWalkthrough": { "type": "boolean" },
+        "includeParticipantsTable": { "type": "boolean" }
+      }
+    },
+    "ignorePatterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "participantsAliases": {
+      "type": "object"
+    },
+    "styling": {
+      "type": "object",
+      "properties": {
+        "showErrorBranches": { "type": "boolean" },
+        "showDatabaseTransactions": { "type": "boolean" },
+        "showAsyncQueues": { "type": "boolean" },
+        "accentColor": { "type": "string" }
+      }
+    }
+  }
+}

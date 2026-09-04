@@ -1,0 +1,36 @@
+{
+  "language": "php",
+  "displayName": "PHP (Laravel / Symfony)",
+  "manifestTriggers": ["composer.json", "composer.lock"],
+  "extensions": [".php"],
+  "frameworks": {
+    "laravel": {
+      "routePatterns": [
+        "Route::(get|post|put|delete|patch|options)\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*,\\s*(?:\\[([a-zA-Z0-9_\\\\]+)::class,\\s*[\"']([a-zA-Z0-9_]+)[\"']\\]|function)",
+        "Route::apiResource\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "public\\s+function\\s+([a-zA-Z0-9_]+)\\s*\\((?:Request\\s+\\$request)?",
+      "middlewarePatterns": ["->middleware\\(([^)]+)\\)"],
+      "responsePatterns": ["response\\(\\)->json\\(([^)]*)\\)", "return\\s+view\\("]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "try\\s*\\{[\\s\\S]*?\\}\\s*catch\\s*\\(([A-Za-z0-9_\\\\]+)\\s+\\$e\\)",
+      "throw\\s+new\\s+([A-Za-z0-9_\\\\]+Exception)\\(([^)]*)\\)"
+    ],
+    "asyncWorkflow": [
+      "dispatch\\(", "dispatchSync\\(", "Queue::push"
+    ]
+  },
+  "database": {
+    "ormTriggers": ["Illuminate\\Database\\Eloquent", "Doctrine\\ORM"],
+    "queryMethods": [
+      "find", "findOrFail", "first", "where", "create", "save", "update", "delete", "get"
+    ]
+  },
+  "externalCalls": [
+    "Http::(get|post|put|delete|withHeaders)\\(",
+    "GuzzleHttp\\Client"
+  ]
+}

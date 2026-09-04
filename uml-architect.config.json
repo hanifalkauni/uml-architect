@@ -1,0 +1,54 @@
+{
+  "$schema": "./schema.json",
+  "defaultDiagramType": "sequence",
+  "detailLevel": "standard",
+  "theme": "tokyo-night",
+  "polyglot": {
+    "preferTreeSitter": true,
+    "scanSubmodules": true,
+    "frameworkHints": {
+      "python": "fastapi",
+      "java": "spring-boot",
+      "go": "gin",
+      "csharp": "aspnet-core",
+      "rust": "axum",
+      "php": "laravel",
+      "ruby": "rails"
+    }
+  },
+  "adapters": {
+    "antigravity": true,
+    "cursor": true,
+    "claudeCode": true,
+    "windsurf": true,
+    "copilot": true,
+    "cline": true,
+    "kiro": true
+  },
+  "output": {
+    "directory": "docs/diagrams",
+    "format": ["mermaid", "markdown", "puml"],
+    "includeNarrativeWalkthrough": true,
+    "includeParticipantsTable": true
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/target/**",
+    "**/dist/**",
+    "**/.git/**",
+    "**/*_test.*",
+    "**/*.spec.*"
+  ],
+  "participantsAliases": {
+    "AuthController": "Auth Controller",
+    "JwtService": "JWT Security Provider",
+    "UserRepository": "PostgreSQL (Users Table)"
+  },
+  "styling": {
+    "showErrorBranches": true,
+    "showDatabaseTransactions": true,
+    "showAsyncQueues": true,
+    "accentColor": "#7aa2f7"
+  }
+}

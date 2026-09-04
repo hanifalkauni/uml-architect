@@ -1,0 +1,57 @@
+{
+  "name": "uml-architect",
+  "version": "1.1.0",
+  "description": "Universal Autonomous Code-to-Diagram AI Skill Agent for Any IDE and Any Programming Language",
+  "type": "module",
+  "main": "core/index.js",
+  "bin": {
+    "uml-architect": "./bin/uml-architect.js"
+  },
+  "files": [
+    "bin",
+    "core",
+    "profiles",
+    "adapters",
+    "uml-architect.config.json",
+    "schema.json",
+    "SKILL.md",
+    "README.md",
+    "README.id.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hanifalkauni/uml-architect.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hanifalkauni/uml-architect/issues"
+  },
+  "homepage": "https://github.com/hanifalkauni/uml-architect#readme",
+  "scripts": {
+    "test": "node tests/test_all.js",
+    "start": "node bin/uml-architect.js",
+    "mcp": "node bin/uml-architect.js --mcp"
+  },
+  "keywords": [
+    "uml",
+    "sequence-diagram",
+    "flowchart",
+    "erd",
+    "class-diagram",
+    "mermaid",
+    "plantuml",
+    "ai-agent",
+    "code-to-diagram",
+    "antigravity",
+    "cursor",
+    "claude",
+    "windsurf",
+    "copilot",
+    "mcp",
+    "polyglot"
+  ],
+  "author": "Hanif Al-Kauni",
+  "license": "MIT"
+}

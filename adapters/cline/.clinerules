@@ -1,0 +1,8 @@
+# Roo Code & Cline Rules: UML-Architect
+
+When asked to document, visualize, or diagram code execution paths:
+1. Locate route or function definitions.
+2. Trace downstream dependencies: controllers, services, database models, and external clients.
+3. Formulate standard Mermaid sequence diagrams using `sequenceDiagram` and `autonumber`.
+4. Add alternate execution branches (`alt` / `else` / `end`) for error handling and validation failures.
+5. Provide text descriptions for accessibility and review.

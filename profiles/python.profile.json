@@ -1,0 +1,53 @@
+{
+  "language": "python",
+  "displayName": "Python",
+  "manifestTriggers": ["pyproject.toml", "requirements.txt", "Pipfile", "setup.py", "poetry.lock"],
+  "extensions": [".py"],
+  "frameworks": {
+    "fastapi": {
+      "routePatterns": [
+        "@(app|router)\\.(get|post|put|delete|patch|options)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "(?:async\\s+)?def\\s+([a-zA-Z0-9_]+)\\s*\\([^)]*\\)",
+      "middlewarePatterns": ["Depends\\(([^)]+)\\)", "Security\\(([^)]+)\\)"],
+      "responsePatterns": ["return\\s+[^\\n]+", "raise\\s+HTTPException\\(status_code=(\\d+)"]
+    },
+    "django": {
+      "routePatterns": [
+        "path\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*,\\s*([a-zA-Z0-9_.]+)",
+        "re_path\\s*\\(\\s*r?[\"']([^\"']+)[\"']"
+      ],
+      "handlerSignature": "def\\s+([a-zA-Z0-9_]+)\\s*\\(request[^)]*\\)",
+      "responsePatterns": ["JsonResponse\\(", "HttpResponse\\(", "Response\\("]
+    },
+    "flask": {
+      "routePatterns": [
+        "@(app|bp|blueprint)\\.route\\s*\\(\\s*[\"']([^\"']+)[\"'](?:\\s*,\\s*methods=\\[([^\\]]+)\\])?"
+      ],
+      "handlerSignature": "def\\s+([a-zA-Z0-9_]+)\\s*\\(",
+      "responsePatterns": ["jsonify\\(", "render_template\\("]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "try\\s*:[\\s\\S]*?except\\s+([A-Za-z0-9_,\\s]+)\\s*(?:as\\s+\\w+)?:",
+      "raise\\s+([A-Za-z0-9_]+Exception|HTTPException|ValueError|TypeError)\\(([^)]*)\\)"
+    ],
+    "asyncWorkflow": [
+      "await\\s+([a-zA-Z0-9_.]+)\\(",
+      "asyncio\\.gather\\(",
+      "celery\\.task|\\.delay\\("
+    ]
+  },
+  "database": {
+    "ormTriggers": ["sqlalchemy", "django.db", "tortoise", "peewee", "motor", "pymongo"],
+    "queryMethods": [
+      "filter", "filter_by", "all", "first", "get", "add", "commit", "rollback", "save", "delete", "objects\\.create"
+    ]
+  },
+  "externalCalls": [
+    "requests\\.(get|post|put|delete)\\(",
+    "httpx\\.(get|post|put|delete|AsyncClient)\\(",
+    "aiohttp\\.ClientSession"
+  ]
+}

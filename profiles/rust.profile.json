@@ -1,0 +1,44 @@
+{
+  "language": "rust",
+  "displayName": "Rust",
+  "manifestTriggers": ["Cargo.toml", "Cargo.lock"],
+  "extensions": [".rs"],
+  "frameworks": {
+    "axum": {
+      "routePatterns": [
+        "\\.route\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*,\\s*(get|post|put|delete|patch)\\s*\\(\\s*([a-zA-Z0-9_]+)\\s*\\)"
+      ],
+      "handlerSignature": "(?:async\\s+)?fn\\s+([a-zA-Z0-9_]+)\\s*\\([^)]*\\)\\s*(?:->\\s*([^{]+))?",
+      "responsePatterns": ["Json\\(([^)]*)\\)", "StatusCode::[A-Z_]+"]
+    },
+    "actix": {
+      "routePatterns": [
+        "#\\[(get|post|put|delete)\\s*\\(\\s*[\"']([^\"']+)[\"']\\s*\\)\\]"
+      ],
+      "handlerSignature": "(?:async\\s+)?fn\\s+([a-zA-Z0-9_]+)",
+      "responsePatterns": ["HttpResponse::[A-Za-z]+\\("]
+    }
+  },
+  "controlFlow": {
+    "errorHandling": [
+      "match\\s+([a-zA-Z0-9_.]+)\\s*\\{\\s*Ok\\([^)]*\\)\\s*=>[\\s\\S]*?Err\\([^)]*\\)\\s*=>",
+      "\\?\\s*;",
+      "panic!\\(([^)]*)\\)"
+    ],
+    "asyncWorkflow": [
+      "\\.await",
+      "tokio::spawn\\(",
+      "tokio::sync::mpsc"
+    ]
+  },
+  "database": {
+    "ormTriggers": ["diesel", "sqlx", "sea_orm"],
+    "queryMethods": [
+      "fetch_one", "fetch_all", "fetch_optional", "execute", "load", "find", "insert", "update"
+    ]
+  },
+  "externalCalls": [
+    "reqwest::(?:get|post|Client)",
+    "tonic::Request"
+  ]
+}
