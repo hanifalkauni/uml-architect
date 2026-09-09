@@ -78,6 +78,62 @@ graph TB
 
 ---
 
+<span id="struktur-repositori"></span>
+## 📂 Struktur Repositori
+
+```text
+uml-architect/
+├── adapters/                       # Konfigurasi siap pakai lintas agen AI
+│   ├── antigravity/                # Definisi skill dan workspace Google Antigravity
+│   ├── claude/                     # Instruksi proyek Claude Code (CLAUDE.md)
+│   ├── cline/                      # Aturan sistem Roo Code / Cline (.clinerules)
+│   ├── continue/                   # Konfigurasi prompt dan rules Continue.dev
+│   ├── copilot/                    # Instruksi workspace GitHub Copilot
+│   ├── cursor/                     # Konfigurasi aturan IDE Cursor (.cursorrules / .mdc)
+│   ├── frameworks/                 # Konfigurasi swarm LangGraph, AutoGen, dan CrewAI
+│   ├── kiro/                       # Prompt steering IDE Kiro
+│   └── windsurf/                   # Aturan alur kerja Windsurf IDE (.windsurfrules)
+├── bin/
+│   └── uml-architect.js            # Peluncur CLI universal dan jembatan agen
+├── core/                           # Sub-engine sintesis diagram zero-dependency
+│   ├── index.js                    # API Orchestrator Programatik
+│   ├── manifest_sniffer.js         # Engine deteksi manifest & framework
+│   ├── mcp_server.js               # Server MCP JSON-RPC 2.0 dengan 6 tools diagram
+│   ├── profile_loader.js           # Pemuat profil sintaksis multi-bahasa
+│   ├── synthesizer.js              # Sintesis diagram Mermaid.js & PlantUML
+│   ├── tracer.js                   # Pelacak logika AST zero-compiler & graf panggilan
+│   └── validator.js                # Validator sintaksis diagram & aksesibilitas
+├── docs/                           # Spesifikasi & diagram arsitektur
+├── evaluations/                    # Dataset tolok ukur pengujian & arsip umpan balik
+│   ├── archive/                    # Arsip studi kasus benchmark
+│   ├── README.md                   # Panduan framework evaluasi dan pengujian benchmark
+│   └── TEMPLATE_FEEDBACK.md        # Templat pengajuan umpan balik standar
+├── profiles/                       # Definisi regex AST dan komentar spesifik bahasa
+│   ├── csharp.profile.json         # Profil sintaksis C# (.cs)
+│   ├── generic.profile.json        # Profil sintaksis berkas generik / teks
+│   ├── go.profile.json             # Profil sintaksis Go (.go)
+│   ├── jvm.profile.json            # Profil Java / Kotlin / Scala
+│   ├── php.profile.json            # Profil sintaksis PHP (.php)
+│   ├── python.profile.json         # Profil sintaksis Python (.py)
+│   ├── ruby.profile.json           # Profil sintaksis Ruby (.rb)
+│   ├── rust.profile.json           # Profil sintaksis Rust (.rs)
+│   └── typescript.profile.json     # Profil TypeScript / JavaScript (.ts, .tsx, .js, .jsx)
+├── tests/                          # Rangkaian pengujian otomatis
+│   ├── fixtures/                   # Sampel uji AST dan log multi-bahasa
+│   └── test_all.js                 # Pengujian unit dan integrasi komprehensif
+├── .gitignore                      # Aturan pengabaian berkas Git
+├── CONTRIBUTING.md                 # Panduan kontribusi & batasan arsitektur
+├── LICENSE                         # Spesifikasi Lisensi MIT
+├── package.json                    # Manifest Node.js & konfigurasi zero-dependency
+├── README.id.md                    # Dokumentasi Bahasa Indonesia
+├── README.md                       # Dokumentasi Bahasa Inggris
+├── schema.json                     # Definisi JSON Schema integrasi tool MCP
+├── SKILL.md                        # Lembar instruksi skill utama & panduan alur kerja
+└── uml-architect.config.json       # Konfigurasi sintesis UML tingkat proyek
+```
+
+---
+
 ## 🔠 Bahasa & Framework yang Didukung
 
 UML-Architect membaca file konfigurasi proyek (*manifest*) untuk mendeteksi rute, middleware, ORM, dan antrean asinkron secara otomatis tanpa menjalankan compiler:

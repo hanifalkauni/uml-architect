@@ -78,6 +78,62 @@ graph TB
 
 ---
 
+<span id="repository-structure"></span>
+## 📂 Repository Layout
+
+```text
+uml-architect/
+├── adapters/                       # Ready-to-use cross-agent configurations
+│   ├── antigravity/                # Google Antigravity skill & workspace definitions
+│   ├── claude/                     # Claude Code (CLAUDE.md) project instructions
+│   ├── cline/                      # Roo Code / Cline (.clinerules) system rules
+│   ├── continue/                   # Continue.dev prompt & agent rules
+│   ├── copilot/                    # GitHub Copilot workspace instructions
+│   ├── cursor/                     # Cursor IDE (.cursorrules / .mdc)
+│   ├── frameworks/                 # LangGraph, AutoGen, and CrewAI swarm configs
+│   ├── kiro/                       # Kiro IDE steering prompts
+│   └── windsurf/                   # Windsurf IDE (.windsurfrules)
+├── bin/
+│   └── uml-architect.js            # Universal CLI launcher and agent bridge
+├── core/                           # Zero-dependency diagram synthesis sub-engines
+│   ├── index.js                    # Programmatic Orchestrator API
+│   ├── manifest_sniffer.js         # Manifest & framework detection engine
+│   ├── mcp_server.js               # JSON-RPC 2.0 MCP server with 6 diagram tools
+│   ├── profile_loader.js           # Multi-language profile loader
+│   ├── synthesizer.js              # Mermaid.js & PlantUML diagram synthesizer
+│   ├── tracer.js                   # Zero-compiler AST logic & call-graph tracer
+│   └── validator.js                # Diagram syntax & accessibility validator
+├── docs/                           # Architecture specifications & diagrams
+├── evaluations/                    # Real-world benchmark dataset & feedback archive
+│   ├── archive/                    # Archived benchmark test cases
+│   ├── README.md                   # Evaluation framework and benchmarking guidelines
+│   └── TEMPLATE_FEEDBACK.md        # Standardized feedback submission template
+├── profiles/                       # Language-specific AST regex and comment definitions
+│   ├── csharp.profile.json         # C# (.cs) syntax profile
+│   ├── generic.profile.json        # Generic / text file syntax profile
+│   ├── go.profile.json             # Go (.go) syntax profile
+│   ├── jvm.profile.json            # Java / Kotlin / Scala profile
+│   ├── php.profile.json            # PHP (.php) syntax profile
+│   ├── python.profile.json         # Python (.py) syntax profile
+│   ├── ruby.profile.json           # Ruby (.rb) syntax profile
+│   ├── rust.profile.json           # Rust (.rs) syntax profile
+│   └── typescript.profile.json     # TypeScript / JavaScript (.ts, .tsx, .js, .jsx) profile
+├── tests/                          # Automated verification test suite
+│   ├── fixtures/                   # Multi-language AST and log test fixtures
+│   └── test_all.js                 # Comprehensive unit and integration tests
+├── .gitignore                      # Git ignore rules
+├── CONTRIBUTING.md                 # Contribution guidelines & architecture constraints
+├── LICENSE                         # MIT License specification
+├── package.json                    # Node.js project manifest and zero-dependency configuration
+├── README.id.md                    # Indonesian documentation
+├── README.md                       # English documentation
+├── schema.json                     # JSON Schema definition for MCP tool integration
+├── SKILL.md                        # Master skill instructions and workflow cheatsheet
+└── uml-architect.config.json       # Project-level UML synthesis configuration
+```
+
+---
+
 ## 🔠 Supported Languages & Frameworks
 
 UML-Architect scans project manifests to automatically resolve routing, controller delegators, ORM calls, and async queues without running compilers:
