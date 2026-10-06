@@ -5,7 +5,7 @@
 **Universal Autonomous Code-to-Diagram AI Skill Agent & MCP Server**  
 *Generate 100% accurate, syntax-validated Sequence Diagrams, Flowcharts, and Architecture UML across any programming language and any AI Agent IDE.*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-7aa2f7.svg?style=for-the-badge)](package.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?style=for-the-badge&logo=nodedotjs)](https://nodejs.org)
 [![Mermaid.js](https://img.shields.io/badge/Render-Mermaid.js-ff3670?style=for-the-badge&logo=mermaid)](https://mermaid.js.org)
@@ -123,7 +123,7 @@ uml-architect/
 │   └── test_all.js                 # Comprehensive unit and integration tests
 ├── .gitignore                      # Git ignore rules
 ├── CONTRIBUTING.md                 # Contribution guidelines & architecture constraints
-├── LICENSE                         # MIT License specification
+├── LICENSE                         # Apache License 2.0 specification
 ├── package.json                    # Node.js project manifest and zero-dependency configuration
 ├── README.id.md                    # Indonesian documentation
 ├── README.md                       # English documentation
@@ -438,9 +438,9 @@ Contributions are warmly welcomed! Whether adding new framework profiles, submit
 
 ## 📜 License & Citation
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
+Distributed under the **Apache License 2.0**. See [LICENSE](LICENSE) for more information.
 
 ```text
-SPDX-License-Identifier: MIT
-Copyright (c) 2026 Hanif Al-Kauni
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 Hanif Al-Kauni
 ```

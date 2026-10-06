@@ -5,7 +5,7 @@
 **Universal Autonomous Code-to-Diagram AI Skill Agent & MCP Server**  
 *Pembangkit otomatis Sequence Diagram, Flowchart, dan Arsitektur UML yang 100% akurat, tervalidasi sintaksnya, untuk bahasa pemrograman apa pun dan di AI Agent IDE mana pun.*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-7aa2f7.svg?style=for-the-badge)](package.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?style=for-the-badge&logo=nodedotjs)](https://nodejs.org)
 [![Mermaid.js](https://img.shields.io/badge/Render-Mermaid.js-ff3670?style=for-the-badge&logo=mermaid)](https://mermaid.js.org)
@@ -123,7 +123,7 @@ uml-architect/
 │   └── test_all.js                 # Pengujian unit dan integrasi komprehensif
 ├── .gitignore                      # Aturan pengabaian berkas Git
 ├── CONTRIBUTING.md                 # Panduan kontribusi & batasan arsitektur
-├── LICENSE                         # Spesifikasi Lisensi MIT
+├── LICENSE                         # Spesifikasi Lisensi Apache 2.0
 ├── package.json                    # Manifest Node.js & konfigurasi zero-dependency
 ├── README.id.md                    # Dokumentasi Bahasa Indonesia
 ├── README.md                       # Dokumentasi Bahasa Inggris
@@ -437,9 +437,9 @@ Kontribusi dari komunitas sangat kami nantikan! Baik berupa penambahan profil fr
 
 ## 📜 Lisensi
 
-Didistribusikan di bawah lisensi terbuka **MIT License**. Lihat [LICENSE](LICENSE) untuk detail lengkap.
+Didistribusikan di bawah **Apache License 2.0**. Lihat [LICENSE](LICENSE) untuk detail lengkap.
 
 ```text
-SPDX-License-Identifier: MIT
-Copyright (c) 2026 Hanif Al-Kauni
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 Hanif Al-Kauni
 ```
