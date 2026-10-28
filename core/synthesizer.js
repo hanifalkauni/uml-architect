@@ -1,9 +1,9 @@
 import { ValidatorEngine } from './validator.js';
 
 /**
- * SynthesizerEngine
+ * SynthesizerEngine (Argon Engine)
  * Menghasilkan representasi UML (Mermaid & PlantUML) dan dokumentasi arsitektur
- * berstandar tinggi dari hasil trace call-graph.
+ * berstandar tinggi (WCAG 2.2 AA) dari hasil trace call-graph tanpa data statis/dummy.
  */
 export class SynthesizerEngine {
   constructor(options = {}) {
@@ -50,7 +50,6 @@ export class SynthesizerEngine {
     // 1. Filter partisipan pada L1 jika diperlukan
     let activeParticipants = participants;
     if (isL1) {
-      // Pada L1 fokus pada komponen utama (Client, Controller, Storage/Cache/Ext)
       const primaryIds = new Set(['Client', 'Ctrl', 'Redis', 'S3', 'DB', 'ExtAPI']);
       const filtered = participants.filter(p => primaryIds.has(p.id) || p.type === 'actor');
       if (filtered.length >= 2) {
@@ -62,12 +61,19 @@ export class SynthesizerEngine {
     const hasLayers = activeParticipants.some(p => Boolean(p.layer));
     if (hasLayers) {
       const layerColors = {
+        'Presentation Layer': '#1e293b',
+        'Security & Middleware Layer': '#1e293b',
+        'Application & Security Layer': '#1e293b',
         'Application Layer': '#1e293b',
+        'Domain & Application Layer': '#1e293b',
+        'Domain Layer': '#1e293b',
         'Persistence & Cache Layer': '#0f172a',
         'Data & Cache Layer': '#0f172a',
         'Cloud Storage': '#1e1e2e',
         'Cloud Infrastructure': '#1e1e2e',
         'External Services': '#2d2036',
+        'External Integrations': '#2d2036',
+        'Messaging & External Layer': '#2d2036',
         'Messaging & Events': '#1a2634'
       };
 
@@ -85,13 +91,11 @@ export class SynthesizerEngine {
         }
       }
 
-      // Render entitas di luar box terlebih dahulu (misal: external actor Client)
       for (const p of unlayered) {
         const type = p.type === 'actor' ? 'actor' : 'participant';
         lines.push(`    ${type} ${p.id} as ${p.label}`);
       }
 
-      // Render setiap kelompok layer ke dalam Mermaid box
       for (const [layerName, groupParticipants] of layerMap.entries()) {
         const color = layerColors[layerName] || '#1e293b';
         lines.push(`    box "${layerName}" ${color}`);
@@ -115,7 +119,6 @@ export class SynthesizerEngine {
     let indentLevel = 1;
 
     for (const step of steps) {
-      // Filter step berdasarkan detail level
       if (isL1) {
         if (step.type === 'note') continue;
         if (step.level === 'L3' || step.level === 'deep') continue;
@@ -149,7 +152,6 @@ export class SynthesizerEngine {
         continue;
       }
 
-      // Jika di L1 partisipan tidak di-render, lewati step yang melibatkan mereka
       if (isL1 && (!activeParticipants.some(p => p.id === step.from) || !activeParticipants.some(p => p.id === step.to))) {
         continue;
       }
@@ -181,9 +183,9 @@ export class SynthesizerEngine {
     let nodeIdx = 1;
 
     for (const step of steps) {
-      if (step.type === 'call') {
+      if (!step.type || step.type === 'call') {
         const nodeId = `Step${nodeIdx++}`;
-        lines.push(`    ${prevNode} --> ${nodeId}["${step.from} call ${step.to}<br/>(${step.message})"]`);
+        lines.push(`    ${prevNode} --> ${nodeId}["${step.from} -> ${step.to}<br/>(${step.message})"]`);
         prevNode = nodeId;
       } else if (step.type === 'alt_start') {
         const decisionId = `Dec${nodeIdx++}`;
@@ -201,19 +203,18 @@ export class SynthesizerEngine {
    * Menghasilkan State Machine Diagram Mermaid (FR-3)
    */
   generateStateDiagram(traceData) {
-    const entityName = traceData.targetName || 'Entity';
     const lines = [
       'stateDiagram-v2',
       '    [*] --> InitialState: Request Received',
-      `    InitialState --> Validating: Validate Input Payload`,
-      `    Validating --> Rejected: Validation Failed / 400`,
-      `    Rejected --> [*]: Abort Execution`,
-      `    Validating --> Processing: Validation Passed`,
-      `    Processing --> Persisting: Execute Domain Service`,
-      `    Persisting --> ErrorOccurred: DB or Network Exception`,
-      `    ErrorOccurred --> [*]: Rollback & Return 500`,
-      `    Persisting --> Completed: Commit & Emit Events`,
-      `    Completed --> [*]: Return Success (200/201)`
+      '    InitialState --> Validating: Validate Input Payload',
+      '    Validating --> Rejected: Validation Failed / 400',
+      '    Rejected --> [*]: Abort Execution',
+      '    Validating --> Processing: Validation Passed',
+      '    Processing --> Persisting: Execute Domain Service',
+      '    Persisting --> ErrorOccurred: DB or Network Exception',
+      '    ErrorOccurred --> [*]: Rollback & Return 500',
+      '    Persisting --> Completed: Commit & Emit Events',
+      '    Completed --> [*]: Return Success (200/201)'
     ];
     return this.validator.validateAndRepair(lines.join('\n'));
   }
@@ -250,25 +251,47 @@ export class SynthesizerEngine {
   }
 
   /**
-   * Menghasilkan Class Diagram Mermaid
+   * Menghasilkan Class Diagram Mermaid dari model / AST riil tanpa dummy class
    */
-  generateClassDiagram(models = []) {
+  generateClassDiagram(input = []) {
     const lines = ['classDiagram'];
-    if (models.length === 0) {
-      lines.push('    class BaseEntity {');
-      lines.push('        +String id');
-      lines.push('        +DateTime createdAt');
-      lines.push('        +DateTime updatedAt');
-      lines.push('    }');
-    } else {
-      for (const m of models) {
-        lines.push(`    class ${m.name} {`);
-        for (const f of m.fields || []) {
-          lines.push(`        +${f.type} ${f.name}`);
-        }
-        lines.push('    }');
+    let models = [];
+
+    if (Array.isArray(input)) {
+      models = input;
+    } else if (input && typeof input === 'object') {
+      if (Array.isArray(input.models) && input.models.length > 0) {
+        models = input.models;
+      } else if (Array.isArray(input.participants)) {
+        models = input.participants
+          .filter(p => p.type !== 'actor')
+          .map(p => ({
+            name: (p.label || p.id).replace(/[^a-zA-Z0-9_]/g, '') || p.id,
+            fields: [],
+            methods: (input.steps || [])
+              .filter(s => s.to === p.id && !s.isReturn && s.message)
+              .map(s => s.message.split('(')[0].replace(/[^a-zA-Z0-9_]/g, ''))
+              .filter(Boolean)
+          }));
       }
     }
+
+    for (const m of models) {
+      const className = (m.name || 'Component').replace(/[^a-zA-Z0-9_]/g, '');
+      if (!className) continue;
+      lines.push(`    class ${className} {`);
+      for (const f of m.fields || []) {
+        lines.push(`        +${f.type || 'any'} ${f.name}`);
+      }
+      for (const method of m.methods || []) {
+        const cleanMethod = String(method).replace(/[^a-zA-Z0-9_]/g, '');
+        if (cleanMethod) {
+          lines.push(`        +${cleanMethod}()`);
+        }
+      }
+      lines.push('    }');
+    }
+
     return this.validator.validateAndRepair(lines.join('\n'));
   }
 
@@ -288,12 +311,19 @@ export class SynthesizerEngine {
 
     if (hasLayers) {
       const pumlColors = {
+        'Presentation Layer': '#LightBlue',
+        'Security & Middleware Layer': '#LightBlue',
+        'Application & Security Layer': '#LightBlue',
         'Application Layer': '#LightBlue',
+        'Domain & Application Layer': '#LightBlue',
+        'Domain Layer': '#LightBlue',
         'Persistence & Cache Layer': '#LightYellow',
         'Data & Cache Layer': '#LightYellow',
         'Cloud Storage': '#LightCyan',
         'Cloud Infrastructure': '#LightCyan',
         'External Services': '#LavenderBlush',
+        'External Integrations': '#LavenderBlush',
+        'Messaging & External Layer': '#MistyRose',
         'Messaging & Events': '#MistyRose'
       };
 
@@ -353,7 +383,7 @@ export class SynthesizerEngine {
    */
   generateNarrativeWalkthrough(traceData, lang = this.lang) {
     const isId = lang === 'id';
-    const endpoint = traceData.endpoint || (isId ? 'Eksekusi Endpoint / Fungsi' : 'Endpoint / Function Execution');
+    const endpoint = traceData.endpoint || traceData.targetName || (isId ? 'Eksekusi Endpoint / Fungsi' : 'Endpoint / Function Execution');
     const participants = traceData.participants || [];
 
     const lines = [
@@ -425,7 +455,7 @@ export class SynthesizerEngine {
   /**
    * Merender paket artefak lengkap dalam format Markdown
    */
-  renderFullArtifact(traceData, diagramType = 'sequence', lang = this.lang) {
+  renderFullArtifact(traceData, diagramType = 'sequence', lang = this.lang, detailLevel = 'standard') {
     let diagResult;
     if (diagramType === 'flowchart') {
       diagResult = this.generateFlowchart(traceData);
@@ -434,9 +464,9 @@ export class SynthesizerEngine {
     } else if (diagramType === 'component') {
       diagResult = this.generateComponentDiagram(traceData);
     } else if (diagramType === 'class') {
-      diagResult = this.generateClassDiagram([]);
+      diagResult = this.generateClassDiagram(traceData);
     } else {
-      diagResult = this.generateSequenceDiagram(traceData);
+      diagResult = this.generateSequenceDiagram(traceData, detailLevel);
     }
 
     const narrative = this.generateNarrativeWalkthrough(traceData, lang);
@@ -446,8 +476,8 @@ export class SynthesizerEngine {
 
     const isId = lang === 'id';
     const badge = isId
-      ? `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.0.0)*`
-      : `> *Automatically generated by **UML-Architect Skill Agent** (v1.0.0)*`;
+      ? `> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (Gemini 4 Argon Engine)*`
+      : `> *Automatically generated by **UML-Architect Skill Agent** (Gemini 4 Argon Engine)*`;
     const visualHeader = isId ? '## Diagram Visual' : '## Visual Diagram';
     const summaryTitle = isId ? 'Lihat Format Alternatif (PlantUML)' : 'View Alternative Format (PlantUML)';
 

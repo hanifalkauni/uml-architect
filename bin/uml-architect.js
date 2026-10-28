@@ -8,7 +8,7 @@ const args = process.argv.slice(2);
 
 function printHelp() {
   console.log(`
-UML-Architect (v1.0.0) - Universal Autonomous Code-to-Diagram AI Skill Agent
+UML-Architect (v1.1.0 - Gemini 4 Argon Engine) - Universal Autonomous Code-to-Diagram AI Skill Agent
 
 Penggunaan:
   npx uml-architect <command> [options]
@@ -17,7 +17,7 @@ Commands:
   trace       Menelusuri alur eksekusi dari endpoint API dan membuat diagram
   function    Menelusuri hierarki panggilan fungsi/method
   path        Menelusuri modul/file direktori
-  init        Memasang adapter rules (Antigravity, Cursor, Windsurf, Claude, Copilot, Cline)
+  init        Memasang adapter rules (Antigravity, Cursor, Windsurf, Claude, Copilot, Cline, Continue, Kiro)
   profiles    Melihat daftar profil bahasa yang didukung
   --mcp       Menjalankan Model Context Protocol (MCP) server via stdio
 
@@ -25,17 +25,27 @@ Options untuk 'trace':
   --endpoint, -e <string>   Endpoint API (contoh: "POST /api/v1/orders")
   --method, -m <string>     HTTP Method (GET, POST, PUT, DELETE, dll.)
   --file, -f <path>         Path file spesifik sumber endpoint
+  --type, -t <type>         Tipe diagram: sequence, flowchart, class, state, component (default: sequence)
+  --detail, -d <level>      Tingkat detail alur: L1, L2, L3 (default: standard)
   --out, -o <path>          Simpan diagram ke file output Markdown (.md)
-  --detail, -d <level>      Tingkat detail alur: L1, L2, L3 (default: L2)
 
 Options untuk 'function':
   --name, -n <string>       Nama fungsi/method
   --file, -f <path>         Path file tempat fungsi berada
+  --type, -t <type>         Tipe diagram: sequence, flowchart, state, class (default: sequence)
+  --detail, -d <level>      Tingkat detail alur: L1, L2, L3 (default: standard)
+  --out, -o <path>          Simpan diagram ke file output Markdown (.md)
+
+Options untuk 'path':
+  --target, -t <path>       Path file atau direktori target
+  --type <type>             Tipe diagram: sequence, flowchart, class, component (default: sequence)
+  --detail, -d <level>      Tingkat detail alur: L1, L2, L3 (default: standard)
   --out, -o <path>          Simpan diagram ke file output Markdown (.md)
 
 Contoh:
-  npx uml-architect trace --endpoint "POST /api/orders/checkout"
-  npx uml-architect function --name "processRefund" --file "src/services/pay.ts"
+  npx uml-architect trace --endpoint "POST /api/orders/checkout" --detail L2
+  npx uml-architect function --name "processRefund" --file "src/services/pay.ts" --type flowchart
+  npx uml-architect path --target "src/modules/auth" --type component
   npx uml-architect init
   npx uml-architect --mcp
 `);
@@ -48,7 +58,7 @@ async function main() {
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    console.log('uml-architect v1.0.0');
+    console.log('uml-architect v1.1.0');
     process.exit(0);
   }
 
@@ -103,11 +113,13 @@ async function main() {
     const file = getArg(['--file', '-f']);
     const out = getArg(['--out', '-o']);
     const detail = getArg(['--detail', '-d']) || 'standard';
+    const diagType = getArg(['--type', '-t']) || 'sequence';
 
     console.log(`\n🔍 Menganalisis alur eksekusi untuk endpoint: ${endpoint}...`);
     const result = await architect.generateFromEndpoint(endpoint, {
       method,
       targetFile: file,
+      diagramType: diagType,
       detailLevel: detail,
       outputFile: out
     });
@@ -128,10 +140,14 @@ async function main() {
 
     const file = getArg(['--file', '-f']);
     const out = getArg(['--out', '-o']);
+    const detail = getArg(['--detail', '-d']) || 'standard';
+    const diagType = getArg(['--type', '-t']) || 'sequence';
 
     console.log(`\n🔍 Menganalisis alur fungsi: ${fnName}...`);
     const result = await architect.generateFromFunction(fnName, {
       file,
+      diagramType: diagType,
+      detailLevel: detail,
       outputFile: out
     });
 
@@ -150,8 +166,13 @@ async function main() {
     }
 
     const out = getArg(['--out', '-o']);
+    const detail = getArg(['--detail', '-d']) || 'standard';
+    const diagType = getArg(['--type']) || 'sequence';
+
     console.log(`\n🔍 Menganalisis alur dari path: ${targetPath}...`);
     const result = await architect.generateFromPath(targetPath, {
+      diagramType: diagType,
+      detailLevel: detail,
       outputFile: out
     });
 

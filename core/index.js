@@ -48,14 +48,17 @@ export class UmlArchitect {
    * Menghasilkan UML diagram dari Endpoint API
    */
   async generateFromEndpoint(endpoint, options = {}) {
+    const detail = options.detailLevel || this.detailLevel;
     const traceData = await this.tracer.traceEndpoint(endpoint, {
       httpMethod: options.method || options.httpMethod,
       targetFile: options.targetFile || options.file,
-      detailLevel: options.detailLevel || this.detailLevel
+      targetMethod: options.targetMethod,
+      detailLevel: detail
     });
 
+    if (options.theme) this.synthesizer.theme = options.theme;
     const diagramType = options.diagramType || this.config.defaultDiagramType || 'sequence';
-    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType);
+    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType, this.lang, detail);
 
     if (options.outputFile) {
       this.saveToFile(options.outputFile, markdown);
@@ -64,7 +67,7 @@ export class UmlArchitect {
     return {
       traceData,
       markdown,
-      diagram: this.synthesizer.generateSequenceDiagram(traceData).fixedMermaid
+      diagram: this.synthesizer.generateSequenceDiagram(traceData, detail).fixedMermaid
     };
   }
 
@@ -72,12 +75,14 @@ export class UmlArchitect {
    * Menghasilkan UML diagram dari Function/Method
    */
   async generateFromFunction(functionName, options = {}) {
+    const detail = options.detailLevel || this.detailLevel;
     const traceData = await this.tracer.traceFunction(functionName, options.file || options.filePath, {
-      detailLevel: options.detailLevel || this.detailLevel
+      detailLevel: detail
     });
 
+    if (options.theme) this.synthesizer.theme = options.theme;
     const diagramType = options.diagramType || 'sequence';
-    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType);
+    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType, this.lang, detail);
 
     if (options.outputFile) {
       this.saveToFile(options.outputFile, markdown);
@@ -86,7 +91,7 @@ export class UmlArchitect {
     return {
       traceData,
       markdown,
-      diagram: this.synthesizer.generateSequenceDiagram(traceData).fixedMermaid
+      diagram: this.synthesizer.generateSequenceDiagram(traceData, detail).fixedMermaid
     };
   }
 
@@ -94,12 +99,14 @@ export class UmlArchitect {
    * Menghasilkan UML diagram dari File atau Modul Path
    */
   async generateFromPath(targetPath, options = {}) {
+    const detail = options.detailLevel || this.detailLevel;
     const traceData = await this.tracer.tracePath(targetPath, {
-      detailLevel: options.detailLevel || this.detailLevel
+      detailLevel: detail
     });
 
+    if (options.theme) this.synthesizer.theme = options.theme;
     const diagramType = options.diagramType || 'sequence';
-    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType);
+    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType, this.lang, detail);
 
     if (options.outputFile) {
       this.saveToFile(options.outputFile, markdown);
@@ -108,7 +115,7 @@ export class UmlArchitect {
     return {
       traceData,
       markdown,
-      diagram: this.synthesizer.generateSequenceDiagram(traceData).fixedMermaid
+      diagram: this.synthesizer.generateSequenceDiagram(traceData, detail).fixedMermaid
     };
   }
 
@@ -117,12 +124,14 @@ export class UmlArchitect {
    * Contoh: "Gambarkan alur saat webhook Stripe diterima"
    */
   async generateFromQuery(query, options = {}) {
+    const detail = options.detailLevel || this.detailLevel;
     const traceData = await this.tracer.traceNaturalLanguage(query, {
-      detailLevel: options.detailLevel || this.detailLevel
+      detailLevel: detail
     });
 
+    if (options.theme) this.synthesizer.theme = options.theme;
     const diagramType = options.diagramType || 'sequence';
-    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType);
+    const markdown = this.synthesizer.renderFullArtifact(traceData, diagramType, this.lang, detail);
 
     if (options.outputFile) {
       this.saveToFile(options.outputFile, markdown);
@@ -131,7 +140,7 @@ export class UmlArchitect {
     return {
       traceData,
       markdown,
-      diagram: this.synthesizer.generateSequenceDiagram(traceData).fixedMermaid
+      diagram: this.synthesizer.generateSequenceDiagram(traceData, detail).fixedMermaid
     };
   }
 

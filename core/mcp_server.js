@@ -50,7 +50,8 @@ export class McpServer {
           properties: {
             function_name: { type: 'string', description: 'Nama function atau method (contoh: "reconcileLedgerBalance")' },
             file_path: { type: 'string', description: 'Path ke file tempat function didefinisikan' },
-            diagram_type: { type: 'string', enum: ['sequence', 'flowchart', 'state'], default: 'sequence' }
+            diagram_type: { type: 'string', enum: ['sequence', 'flowchart', 'state', 'class'], default: 'sequence' },
+            detail_level: { type: 'string', enum: ['L1', 'L2', 'L3', 'standard', 'high', 'deep'], default: 'standard' }
           },
           required: ['function_name']
         }
@@ -62,7 +63,8 @@ export class McpServer {
           type: 'object',
           properties: {
             path: { type: 'string', description: 'Path relatif file atau folder (contoh: "src/modules/auth")' },
-            diagram_type: { type: 'string', enum: ['sequence', 'flowchart', 'class', 'component'], default: 'sequence' }
+            diagram_type: { type: 'string', enum: ['sequence', 'flowchart', 'class', 'component', 'state'], default: 'sequence' },
+            detail_level: { type: 'string', enum: ['L1', 'L2', 'L3', 'standard', 'high', 'deep'], default: 'standard' }
           },
           required: ['path']
         }
@@ -147,7 +149,7 @@ export class McpServer {
           },
           serverInfo: {
             name: 'uml-architect',
-            version: '1.0.0'
+            version: '1.1.0'
           }
         }
       };
@@ -174,27 +176,32 @@ export class McpServer {
           const target = args.target || '';
           const diagType = args.diagram_type || 'sequence';
           const detail = args.detail_level || 'standard';
+          const theme = args.theme;
 
           let res;
           if (/^(GET|POST|PUT|DELETE|PATCH|OPTIONS|\/)/i.test(target)) {
             res = await this.architect.generateFromEndpoint(target, {
               diagramType: diagType,
-              detailLevel: detail
+              detailLevel: detail,
+              theme
             });
           } else if (target.includes('/') || target.includes('\\')) {
             res = await this.architect.generateFromPath(target, {
               diagramType: diagType,
-              detailLevel: detail
+              detailLevel: detail,
+              theme
             });
           } else if (target.includes(' ') && target.length > 20) {
             res = await this.architect.generateFromQuery(target, {
               diagramType: diagType,
-              detailLevel: detail
+              detailLevel: detail,
+              theme
             });
           } else {
             res = await this.architect.generateFromFunction(target, {
               diagramType: diagType,
-              detailLevel: detail
+              detailLevel: detail,
+              theme
             });
           }
           resultText = res.markdown;
@@ -208,12 +215,14 @@ export class McpServer {
         } else if (toolName === 'trace_function_flow') {
           const res = await this.architect.generateFromFunction(args.function_name, {
             file: args.file_path,
-            diagramType: args.diagram_type
+            diagramType: args.diagram_type,
+            detailLevel: args.detail_level
           });
           resultText = res.markdown;
         } else if (toolName === 'trace_path_flow') {
           const res = await this.architect.generateFromPath(args.path, {
-            diagramType: args.diagram_type
+            diagramType: args.diagram_type,
+            detailLevel: args.detail_level
           });
           resultText = res.markdown;
         } else if (toolName === 'validate_mermaid_syntax') {

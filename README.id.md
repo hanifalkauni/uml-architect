@@ -6,7 +6,7 @@
 *Pembangkit otomatis Sequence Diagram, Flowchart, dan Arsitektur UML yang 100% akurat, tervalidasi sintaksnya, untuk bahasa pemrograman apa pun dan di AI Agent IDE mana pun.*
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-7aa2f7.svg?style=for-the-badge)](package.json)
+[![Version](https://img.shields.io/badge/version-1.1.0-7aa2f7.svg?style=for-the-badge)](package.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?style=for-the-badge&logo=nodedotjs)](https://nodejs.org)
 [![Mermaid.js](https://img.shields.io/badge/Render-Mermaid.js-ff3670?style=for-the-badge&logo=mermaid)](https://mermaid.js.org)
 [![MCP Protocol](https://img.shields.io/badge/Protocol-MCP-8A2BE2?style=for-the-badge)](https://modelcontextprotocol.io)
@@ -90,20 +90,20 @@ uml-architect/
 │   ├── continue/                   # Konfigurasi prompt dan rules Continue.dev
 │   ├── copilot/                    # Instruksi workspace GitHub Copilot
 │   ├── cursor/                     # Konfigurasi aturan IDE Cursor (.cursorrules / .mdc)
-│   ├── frameworks/                 # Konfigurasi swarm LangGraph, AutoGen, dan CrewAI
 │   ├── kiro/                       # Prompt steering IDE Kiro
 │   └── windsurf/                   # Aturan alur kerja Windsurf IDE (.windsurfrules)
 ├── bin/
 │   └── uml-architect.js            # Peluncur CLI universal dan jembatan agen
 ├── core/                           # Sub-engine sintesis diagram zero-dependency
+│   ├── ast_parser.js               # Analisis AST polyglot & graf panggilan token-aware
 │   ├── index.js                    # API Orchestrator Programatik
 │   ├── manifest_sniffer.js         # Engine deteksi manifest & framework
-│   ├── mcp_server.js               # Server MCP JSON-RPC 2.0 dengan 6 tools diagram
+│   ├── mcp_server.js               # Server MCP JSON-RPC 2.0 dengan 7 tools diagram
 │   ├── profile_loader.js           # Pemuat profil sintaksis multi-bahasa
 │   ├── synthesizer.js              # Sintesis diagram Mermaid.js & PlantUML
 │   ├── tracer.js                   # Pelacak logika AST zero-compiler & graf panggilan
 │   └── validator.js                # Validator sintaksis diagram & aksesibilitas
-├── docs/                           # Spesifikasi & diagram arsitektur
+├── docs/                           # Direktori default penyimpanan diagram hasil ekspor
 ├── evaluations/                    # Dataset tolok ukur pengujian & arsip umpan balik
 │   ├── archive/                    # Arsip studi kasus benchmark
 │   ├── README.md                   # Panduan framework evaluasi dan pengujian benchmark
@@ -355,7 +355,7 @@ Setiap diagram yang dihasilkan UML-Architect mengikuti format Markdown baku beri
 
 # UML Diagram: POST /api/v1/orders/checkout
 
-> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (v1.0.0)*
+> *Dihasilkan secara otomatis oleh **UML-Architect Skill Agent** (Gemini 4 Argon Engine)*
 
 ### Diagram Visual
 ```mermaid
@@ -363,11 +363,18 @@ Setiap diagram yang dihasilkan UML-Architect mengikuti format Markdown baku beri
 sequenceDiagram
     autonumber
     actor Client as Frontend Client
-    participant Ctrl as OrderController (Controller)
-    participant PayGW as PaymentGateway (Stripe API)
-    participant DB as PostgreSQL (Database)
 
-    Client->>Ctrl: POST /api/v1/orders/checkout {userId, items}
+    box "Application Layer" #1e293b
+        participant Ctrl as OrderController (Controller)
+    end
+    box "Persistence Layer" #0f172a
+        participant DB as PostgreSQL (Database)
+    end
+    box "External & Messaging" #2d2036
+        participant PayGW as PaymentGateway (Stripe API)
+    end
+
+    Client->>Ctrl: POST /api/v1/orders/checkout
     alt Item Keranjang Kosong
         Ctrl-->>Client: 400 Bad Request ("Cart is empty")
     else Keranjang Valid (Happy Path)
@@ -385,20 +392,30 @@ sequenceDiagram
 ```puml
 @startuml
 autonumber
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
 actor "Frontend Client" as Client
-participant "OrderController (Controller)" as Ctrl
-participant "PaymentGateway (Stripe API)" as PayGW
-participant "PostgreSQL (Database)" as DB
+
+box "Application Layer" #LightBlue
+    participant "OrderController (Controller)" as Ctrl
+end box
+box "Persistence Layer" #LightYellow
+    participant "PostgreSQL (Database)" as DB
+end box
+box "External & Messaging" #LavenderBlush
+    participant "PaymentGateway (Stripe API)" as PayGW
+end box
 
 Client -> Ctrl: POST /api/v1/orders/checkout
 alt Item Keranjang Kosong
-Ctrl --> Client: 400 Bad Request
+    Ctrl --> Client: 400 Bad Request
 else Keranjang Valid (Happy Path)
-Ctrl -> PayGW: POST /v1/charges
-PayGW --> Ctrl: 200 OK
-Ctrl -> DB: UPDATE orders SET status = 'PAID'
-DB --> Ctrl: 1 row affected
-Ctrl --> Client: 201 Created
+    Ctrl -> PayGW: POST /v1/charges
+    PayGW --> Ctrl: 200 OK
+    Ctrl -> DB: UPDATE orders SET status = 'PAID'
+    DB --> Ctrl: 1 row affected
+    Ctrl --> Client: 201 Created
 end
 @enduml
 ```
@@ -420,9 +437,11 @@ Alur eksekusi ini melibatkan **4 komponen utama**:
 5. **OrderController** mengembalikan respons sukses HTTP 201 Created ke pengguna.
 
 #### Penanganan Error & Pengecualian (Error Pathways):
-* **CartEmptyException (400):** Terjadi jika keranjang belanja tidak memiliki item aktif.
-* **PaymentDeclinedException (402):** Terjadi bila otorisasi kartu kredit ditolak oleh gateway pembayaran.
-* **DatabaseTransactionException (500):** Terjadi jika koneksi database terputus saat proses commit.
+| Tipe Exception | Kode Status HTTP | Kondisi Pemicu | Mitigasi / Alur Penanganan |
+| :--- | :--- | :--- | :--- |
+| **CartEmptyException** | `400` | Keranjang checkout tidak memiliki item aktif | Return 400 dengan pesan validasi item |
+| **PaymentDeclinedException** | `402` | Otorisasi kartu kredit ditolak oleh gateway pembayaran | Gagalkan pesanan dan minta metode bayar baru |
+| **DatabaseTransactionException** | `500` | Koneksi database putus atau deadlock saat commit | Rollback transaksi dan return status 500 |
 
 ---
 

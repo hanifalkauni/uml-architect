@@ -1,8 +1,10 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert';
 import { ManifestSniffer } from '../core/manifest_sniffer.js';
 import { ProfileLoader } from '../core/profile_loader.js';
+import { PolyglotAstParser } from '../core/ast_parser.js';
 import { TracerEngine } from '../core/tracer.js';
 import { SynthesizerEngine } from '../core/synthesizer.js';
 import { ValidatorEngine } from '../core/validator.js';
@@ -40,7 +42,7 @@ async function runAsyncTest(name, fn) {
   }
 }
 
-console.log('\n🧪 Menjalankan Test Suite UML-Architect (v1.0.0)...\n');
+console.log('\n🧪 Menjalankan Test Suite UML-Architect (Argon Engine)...\n');
 
 // 1. Test ManifestSniffer
 runTest('ManifestSniffer: Deteksi bahasa dari ekstensi file', () => {
@@ -54,7 +56,7 @@ runTest('ManifestSniffer: Deteksi bahasa dari ekstensi file', () => {
 });
 
 // 2. Test ProfileLoader
-runTest('ProfileLoader: Memuat profil modular dan fallback generic', () => {
+runTest('ProfileLoader: Memuat 9 profil modular dan kompilasi aturan dinamis', () => {
   const loader = new ProfileLoader();
   const tsProfile = loader.getProfile('typescript');
   assert.strictEqual(tsProfile.language, 'typescript');
@@ -67,7 +69,10 @@ runTest('ProfileLoader: Memuat profil modular dan fallback generic', () => {
   assert.strictEqual(genericProfile.language, 'generic');
 
   const supported = loader.listSupportedProfiles();
-  assert.ok(supported.length >= 8, `Harus mendukung minimal 8 profil, didapat: ${supported.length}`);
+  assert.strictEqual(supported.length, 9, `Harus mendukung tepat 9 profil, didapat: ${supported.length}`);
+
+  const allLoaded = loader.loadAllProfiles();
+  assert.strictEqual(allLoaded.size, 9);
 });
 
 // 3. Test ValidatorEngine (Self-Healing)
@@ -96,8 +101,10 @@ await runAsyncTest('TracerEngine: Analisis alur Express TypeScript (sample_expre
     targetFile: fixturePath
   });
 
+  assert.strictEqual(trace.profileUsed, 'typescript');
   assert.ok(trace.participants.some(p => p.id === 'Ctrl'));
   assert.ok(trace.participants.some(p => p.id === 'DB' || p.id === 'Queue'));
+  assert.ok(trace.steps.some(s => s.message && (s.message.includes('findById') || s.message.includes('createOrder'))));
   assert.ok(trace.steps.length >= 5);
   assert.ok(trace.errorBranches.length > 0);
 });
@@ -110,8 +117,10 @@ await runAsyncTest('TracerEngine: Analisis alur Python FastAPI (sample_fastapi.p
     targetFile: fixturePath
   });
 
+  assert.strictEqual(trace.profileUsed, 'python');
   assert.ok(trace.participants.some(p => p.id === 'Ctrl'));
   assert.ok(trace.participants.some(p => p.id === 'DB'));
+  assert.ok(trace.errorBranches.some(e => e.type === 'HTTPException' && e.status === 404));
 });
 
 // 6. Test TracerEngine pada Go Gin Fixture
@@ -122,8 +131,10 @@ await runAsyncTest('TracerEngine: Analisis alur Go Gin (sample_gin.go)', async (
     targetFile: fixturePath
   });
 
+  assert.strictEqual(trace.profileUsed, 'go');
   assert.ok(trace.participants.some(p => p.id === 'Ctrl'));
   assert.ok(trace.participants.some(p => p.id === 'Svc'));
+  assert.ok(trace.steps.some(s => s.message && s.message.includes('Authenticate')));
 });
 
 // 7. Test TracerEngine pada Java Spring Boot Fixture
@@ -134,8 +145,11 @@ await runAsyncTest('TracerEngine: Analisis alur Java Spring Boot (sample_spring.
     targetFile: fixturePath
   });
 
+  assert.strictEqual(trace.profileUsed, 'jvm');
   assert.ok(trace.participants.some(p => p.id === 'Ctrl'));
   assert.ok(trace.participants.some(p => p.id === 'Svc'));
+  assert.ok(trace.steps.some(s => s.message && s.message.includes('processCharge')));
+  assert.ok(trace.errorBranches.some(e => e.type === 'InsufficientFundsException' && e.status === 402));
 });
 
 // 8. Test SynthesizerEngine
@@ -211,17 +225,26 @@ await runAsyncTest('McpServer: Respons JSON-RPC tools/list dan tools/call', asyn
   assert.ok(callResp.result.content[0].text.includes('isValid'));
 });
 
-// 11. Test State & Component Diagram Generation (FR-3)
-runTest('SynthesizerEngine: Menghasilkan State Diagram dan Component Diagram', () => {
+// 11. Test State, Component & Class Diagram Generation (FR-3)
+runTest('SynthesizerEngine: Menghasilkan State, Component, dan Class Diagram dari AST riil', () => {
   const synth = new SynthesizerEngine();
-  const mockTrace = { targetName: 'OrderLifecycle', participants: [], steps: [] };
+  const mockTrace = {
+    targetName: 'OrderLifecycle',
+    participants: [{ id: 'Ctrl', label: 'OrderController', type: 'participant' }],
+    steps: [{ from: 'Client', to: 'Ctrl', message: 'createOrder(dto)' }],
+    models: [{ name: 'OrderController', fields: [{ name: 'orderService', type: 'OrderService' }], methods: ['createOrder'] }]
+  };
   const stateRes = synth.generateStateDiagram(mockTrace);
   assert.ok(stateRes.fixedMermaid.includes('stateDiagram-v2'));
   assert.ok(stateRes.fixedMermaid.includes('[*]'));
 
   const compRes = synth.generateComponentDiagram(mockTrace);
   assert.ok(compRes.fixedMermaid.includes('graph TD'));
-  assert.ok(compRes.fixedMermaid.includes('PresentationLayer') || compRes.fixedMermaid.includes('PresentationTier'));
+  assert.ok(compRes.fixedMermaid.includes('PresentationTier'));
+
+  const classRes = synth.generateClassDiagram(mockTrace);
+  assert.ok(classRes.fixedMermaid.includes('class OrderController'));
+  assert.ok(!classRes.fixedMermaid.includes('BaseEntity'), 'Class diagram tidak boleh menggunakan dummy BaseEntity');
 });
 
 // 12. Test Natural Language Query Tracing (FR-1.4)
@@ -254,7 +277,7 @@ await runAsyncTest('McpServer: Eksekusi tool generate_uml_diagram', async () => 
 });
 
 // 14. Test TracerEngine: Analisis Multi-Tier Laravel Controller (sample_laravel_cache_s3.php)
-await runAsyncTest('TracerEngine: Analisis Multi-Tier Laravel Controller & Local Method Crawling (sample_laravel_cache_s3.php)', async () => {
+await runAsyncTest('TracerEngine: Analisis Multi-Tier Laravel Controller & AST Method Crawling (sample_laravel_cache_s3.php)', async () => {
   const tracer = new TracerEngine({ rootDir: path.resolve(__dirname, '..') });
   const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
   const trace = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
@@ -262,20 +285,20 @@ await runAsyncTest('TracerEngine: Analisis Multi-Tier Laravel Controller & Local
     targetMethod: 'index'
   });
 
-  // Verifikasi partisipan multi-tier dan stereotipe infrastruktur
+  // Verifikasi partisipan multi-tier dengan nama simbol riil dari AST (Zero-Hallucination)
   assert.ok(trace.participants.some(p => p.id === 'Ctrl' && p.layer === 'Application Layer'), 'Ctrl harus berada di Application Layer');
   assert.ok(trace.participants.some(p => p.id === 'Auth' && p.layer === 'Application Layer'), 'Auth harus berada di Application Layer');
-  assert.ok(trace.participants.some(p => p.id === 'CampaignModel' && p.layer === 'Persistence & Cache Layer'), 'CampaignModel harus di Persistence & Cache Layer');
+  assert.ok(trace.participants.some(p => p.id === 'RetailerWrappedCampaign' && p.layer === 'Persistence & Cache Layer'), 'RetailerWrappedCampaign harus diekstrak secara riil di Persistence & Cache Layer');
   assert.ok(trace.participants.some(p => p.id === 'Redis' && p.layer === 'Persistence & Cache Layer'), 'Redis harus di Persistence & Cache Layer');
-  assert.ok(trace.participants.some(p => p.id === 'CompiledModel' && p.layer === 'Persistence & Cache Layer'), 'CompiledModel harus di Persistence & Cache Layer');
+  assert.ok(trace.participants.some(p => p.id === 'RetailerWrappedCampaignAudienceCompiled' && p.layer === 'Persistence & Cache Layer'), 'RetailerWrappedCampaignAudienceCompiled harus diekstrak secara riil di Persistence & Cache Layer');
   assert.ok(trace.participants.some(p => p.id === 'S3' && p.layer === 'Cloud Storage'), 'S3Helper harus di Cloud Storage');
 
-  // Verifikasi pola Cache-Aside dan branching
+  // Verifikasi pola Cache-Aside dan ekstraksi variabel dinamis dari file sumber
   assert.ok(trace.steps.some(s => s.type === 'alt_start' && s.condition.includes('reload == true')), 'Harus mendeteksi invalidasi reload/hdel');
   assert.ok(trace.steps.some(s => s.type === 'alt_start' && s.condition.includes('Cache HIT')), 'Harus mendeteksi Cache HIT');
   assert.ok(trace.steps.some(s => s.type === 'alt_else' && s.condition.includes('Cache MISS')), 'Harus mendeteksi Cache MISS');
   assert.ok(trace.steps.some(s => s.from === 'Ctrl' && s.to === 'S3'), 'Harus terdapat interaksi dari Ctrl ke S3 hasil crawling');
-  assert.ok(trace.steps.some(s => s.from === 'Ctrl' && s.to === 'Redis' && s.message.includes('hset')), 'Harus terdapat penyimpanan ke Redis (hset)');
+  assert.ok(trace.steps.some(s => s.from === 'Ctrl' && s.to === 'Redis' && s.message.includes('hset("ayowrap_{campaignId}"')), 'Harus mengekstrak key Redis secara dinamis dari AST variabel $cacheKey');
 
   // Verifikasi ORM Exception
   assert.ok(trace.errorBranches.some(e => e.type === 'ModelNotFoundException' && e.status === 404), 'Harus mendeteksi ModelNotFoundException (404)');
@@ -325,7 +348,6 @@ await runAsyncTest('Detail Level Granularity: Perbedaan Output L1, L2, dan L3', 
   const synth = new SynthesizerEngine();
   const fixturePath = path.join(fixturesDir, 'sample_laravel_cache_s3.php');
 
-  // L1: High-level simplified
   const traceL1 = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
     targetFile: fixturePath,
     detailLevel: 'L1'
@@ -334,7 +356,6 @@ await runAsyncTest('Detail Level Granularity: Perbedaan Output L1, L2, dan L3', 
   assert.ok(resL1.isValid);
   assert.ok(!resL1.fixedMermaid.includes('Validasi Gagal'), 'L1 tidak boleh menyertakan blok alt validasi');
 
-  // L3: Deep technical with notes
   const traceL3 = await tracer.traceEndpoint('GET /retailer-wrapped/campaign', {
     targetFile: fixturePath,
     detailLevel: 'L3'
@@ -343,6 +364,55 @@ await runAsyncTest('Detail Level Granularity: Perbedaan Output L1, L2, dan L3', 
   assert.ok(resL3.isValid);
   assert.ok(resL3.fixedMermaid.includes('Note over Ctrl,Redis'), 'L3 harus menyertakan Note over Redis untuk Key dan TTL');
   assert.ok(resL3.fixedMermaid.includes('Note over Ctrl,S3'), 'L3 harus menyertakan Note over S3');
+});
+
+// 18. Test Zero-Hallucination Source Code Audit (Tidak boleh ada hardcoded dummy di core/)
+runTest('Zero-Hallucination Audit: Bebas dari hardcoded ayowrap, CampaignModel, BaseEntity, processRequest, dan extractBlockByBraces', () => {
+  const tracerSource = fs.readFileSync(path.resolve(__dirname, '../core/tracer.js'), 'utf8');
+  const synthSource = fs.readFileSync(path.resolve(__dirname, '../core/synthesizer.js'), 'utf8');
+  const astSource = fs.readFileSync(path.resolve(__dirname, '../core/ast_parser.js'), 'utf8');
+
+  assert.ok(!tracerSource.includes('ayowrap'), 'core/tracer.js tidak boleh mengandung hardcoded "ayowrap"');
+  assert.ok(!astSource.includes('ayowrap'), 'core/ast_parser.js tidak boleh mengandung hardcoded "ayowrap"');
+  assert.ok(!tracerSource.includes('CampaignModel'), 'core/tracer.js tidak boleh mengandung hardcoded "CampaignModel"');
+  assert.ok(!tracerSource.includes('processRequest'), 'core/tracer.js tidak boleh mengandung placeholder "processRequest"');
+  assert.ok(!tracerSource.includes('extractBlockByBraces'), 'core/tracer.js harus mengganti extractBlockByBraces dengan AST parser');
+  assert.ok(!synthSource.includes('BaseEntity'), 'core/synthesizer.js tidak boleh mengandung static "BaseEntity"');
+});
+
+// 19. Test PolyglotAstParser: Token-Aware Parsing & Multi-File Resolution
+runTest('PolyglotAstParser: Token-aware block extraction kebal terhadap kurung kurawal di dalam komentar/string', () => {
+  const parser = new PolyglotAstParser({ rootDir: path.resolve(__dirname, '..') });
+  const trickyCode = `
+    export class OrderService {
+      // Komentar dengan kurung kurawal palsu { { {
+      async executeOrder(orderId) {
+        const msg = "String dengan kurung penutup palsu } } }";
+        return Database.save(orderId, msg);
+      }
+    }
+  `;
+  const node = parser.findFunctionNode(trickyCode, 'executeOrder', 'typescript');
+  assert.ok(node, 'Harus berhasil mengekstrak method executeOrder');
+  assert.ok(node.body.includes('Database.save(orderId, msg)'), 'Body method tidak boleh terpotong oleh "}" di dalam string');
+});
+
+// 20. Test ValidatorEngine dengan Theme Directive %%{init:...}%% dan Operator Panah
+await runAsyncTest('ValidatorEngine: Self-healing dengan %%{init}%% directive & preservasi operator "->"', async () => {
+  const validator = new ValidatorEngine();
+  const mermaidWithDirective = [
+    `%%{init: {'theme': 'dark'}}%%`,
+    `sequenceDiagram`,
+    `    autonumber`,
+    `    participant Ctrl`,
+    `    participant S3`,
+    `    alt Kondisi S3`,
+    `        Ctrl->>S3: getObjectContent(record->s3_path)`
+  ].join('\n');
+
+  const valRes = validator.validateAndRepair(mermaidWithDirective);
+  assert.ok(valRes.fixedMermaid.includes('end'), 'Validator harus tetap menutup blok alt meskipun ada directive %%{init}%% di baris pertama');
+  assert.ok(valRes.fixedMermaid.includes('record->s3_path'), 'Validator tidak boleh merusak operator panah "->" di dalam teks pesan');
 });
 
 console.log(`\n========================================`);
@@ -354,4 +424,3 @@ if (passedTests === totalTests) {
   console.error(`❌ BEBERAPA TEST GAGAL.\n`);
   process.exit(1);
 }
-

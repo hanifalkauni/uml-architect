@@ -27,19 +27,20 @@ export class ValidatorEngine {
     }
 
     const lines = cleaned.split('\n');
-    const header = lines[0].trim();
-    const isSequence = header.startsWith('sequenceDiagram');
-    const isFlowchart = header.startsWith('flowchart') || header.startsWith('graph');
+    // Cari baris deklarasi tipe diagram pertama setelah directive %%{init:...}%% atau komentar %%
+    const diagramHeaderLine = (lines.find(l => l.trim() && !l.trim().startsWith('%%')) || '').trim();
+    const isSequence = diagramHeaderLine.startsWith('sequenceDiagram');
+    const isFlowchart = diagramHeaderLine.startsWith('flowchart') || diagramHeaderLine.startsWith('graph');
 
-    let fixedLines = [];
-    let blockStack = [];
+    const fixedLines = [];
+    const blockStack = [];
 
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
       const trimmed = line.trim();
 
-      // Skip baris header awal
-      if (i === 0) {
+      // Lewati baris directive atau header deklarasi diagram
+      if (trimmed.startsWith('%%') || trimmed === diagramHeaderLine) {
         fixedLines.push(line);
         continue;
       }
@@ -52,27 +53,13 @@ export class ValidatorEngine {
           if (blockStack.length > 0) {
             blockStack.pop();
           } else {
-            // Unmatched 'end', abaikan
             warnings.push(`Baris ${i + 1}: Menghapus kata 'end' tanpa blok pembuka`);
             continue;
           }
         }
 
-        // Perbaiki illegal characters pada pesan sequence diagram
-        // Misal: A->>B: GET /api/v1/orders/checkout {id}
-        // Pastikan teks pesan setelah ':' tidak merusak sintaks
-        const msgMatch = line.match(/^(\s*[A-Za-z0-9_]+\s*(?:->>|-->>|->|-->|-\)|-x)\s*[A-Za-z0-9_]+\s*:\s*)(.*)$/);
-        if (msgMatch) {
-          const prefix = msgMatch[1];
-          let msg = msgMatch[2].trim();
-          // Escape karakter kurung siku tanpa pasangan atau tanda kutip ganda rusak
-          msg = msg.replace(/([<>])/g, '\\$1');
-          line = `${prefix}${msg}`;
-        }
-
-        // Perbaiki participant / actor alias jika mengandung karakter ilegal
-        // participant /api/v1 as Endpoint -> participant API as /api/v1
-        const partMatch = line.match(/^(\s*(?:participant|actor)\s+)([^as\s]+)(\s+as\s+.*)$/);
+        // Perbaiki participant / actor ID jika mengandung karakter ilegal (misal slash atau spasi sebelum 'as')
+        const partMatch = line.match(/^(\s*(?:participant|actor)\s+)(\S+)(\s+as\s+.*)$/);
         if (partMatch && /[^a-zA-Z0-9_]/.test(partMatch[2])) {
           const cleanAlias = partMatch[2].replace(/[^a-zA-Z0-9_]/g, '_');
           line = `${partMatch[1]}${cleanAlias}${partMatch[3]}`;
@@ -82,7 +69,6 @@ export class ValidatorEngine {
 
       if (isFlowchart) {
         // Perbaiki node label yang tidak di-quote jika memiliki kurung atau slash
-        // Contoh: A[GET /orders] -> A["GET /orders"]
         line = line.replace(/([A-Za-z0-9_]+)\[([^"\]\n]*[\/\\:{}()][^"\]\n]*)\]/g, '$1["$2"]');
       }
 

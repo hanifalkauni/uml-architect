@@ -2,17 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ManifestSniffer } from './manifest_sniffer.js';
 import { ProfileLoader } from './profile_loader.js';
+import { PolyglotAstParser } from './ast_parser.js';
 
 /**
- * TracerEngine
- * Menganalisis alur eksekusi kode (call-graph) secara deterministik dan anti-halusinasi
- * dari sebuah endpoint, function, path file, ataupun natural language query.
+ * TracerEngine (Argon Engine)
+ * Menganalisis alur eksekusi kode (call-graph) lintas file secara deterministik
+ * dan anti-halusinasi berbasis AST/token-stream dan penegakan dinamis 9 profil bahasa.
  */
 export class TracerEngine {
   constructor(options = {}) {
     this.rootDir = path.resolve(options.rootDir || process.cwd());
     this.sniffer = new ManifestSniffer(this.rootDir);
     this.profileLoader = new ProfileLoader(options.profilesDir);
+    this.astParser = new PolyglotAstParser({ rootDir: this.rootDir });
     this.config = options.config || {};
   }
 
@@ -24,41 +26,46 @@ export class TracerEngine {
     let method = options.httpMethod || options.method || '';
     let urlPath = endpoint.trim();
 
-    // Parse "POST /path" jika diberikan dalam 1 string
     const match = endpoint.match(/^(GET|POST|PUT|DELETE|PATCH|OPTIONS)\s+(.*)$/i);
     if (match) {
       method = match[1].toUpperCase();
       urlPath = match[2].trim();
     }
 
-    // Sniff project languages
     const scan = this.sniffer.sniff();
+    const detectedLang = options.targetFile
+      ? this.sniffer.detectLanguageFromPath(options.targetFile)
+      : scan.primaryLanguage;
+
     const profile = options.targetFile
-      ? this.profileLoader.getProfile(this.sniffer.detectLanguageFromPath(options.targetFile))
+      ? this.profileLoader.getProfile(detectedLang)
       : this.profileLoader.getMergedProfiles(scan.languages);
 
-    // Cari file implementasi jika tidak dispesifikasikan
     const targetFile = options.targetFile || this.findFileByEndpoint(urlPath, profile);
 
     if (targetFile && fs.existsSync(targetFile)) {
+      const fileLang = this.sniffer.detectLanguageFromPath(targetFile);
+      const fileProfile = this.profileLoader.getProfile(fileLang);
       const code = fs.readFileSync(targetFile, 'utf8');
       return this.analyzeCodeContent(code, {
         endpoint: `${method || 'ANY'} ${urlPath}`,
+        httpMethod: method,
+        urlPath,
         targetFile,
-        profile,
+        targetMethod: options.targetMethod,
+        profile: fileProfile,
         detailLevel: options.detailLevel || 'standard'
       });
     }
 
-    // Fallback sintetis berbasis heuristik jika file belum ada di disk (mock / PR analysis)
-    return this.generateSyntheticTrace(method, urlPath, profile, options.detailLevel);
+    return this.generateUnresolvedEndpointTrace(method, urlPath, profile, options.detailLevel);
   }
 
   /**
    * Menelusuri alur berdasarkan Fungsi / Method
    */
   async traceFunction(functionName, filePath = null, options = {}) {
-    const targetFile = filePath || this.findFileByFunction(functionName);
+    const targetFile = filePath ? path.resolve(this.rootDir, filePath) : this.findFileByFunction(functionName);
     const lang = targetFile ? this.sniffer.detectLanguageFromPath(targetFile) : 'generic';
     const profile = this.profileLoader.getProfile(lang);
 
@@ -66,13 +73,14 @@ export class TracerEngine {
       const code = fs.readFileSync(targetFile, 'utf8');
       return this.analyzeCodeContent(code, {
         targetName: functionName,
+        targetMethod: functionName,
         targetFile,
         profile,
         detailLevel: options.detailLevel || 'standard'
       });
     }
 
-    return this.generateSyntheticFunctionTrace(functionName, profile, options.detailLevel);
+    return this.generateUnresolvedFunctionTrace(functionName, profile, options.detailLevel);
   }
 
   /**
@@ -97,7 +105,6 @@ export class TracerEngine {
       });
     }
 
-    // Jika direktori, temukan entry file utama
     const files = fs.readdirSync(fullPath);
     for (const f of files) {
       const child = path.join(fullPath, f);
@@ -119,7 +126,6 @@ export class TracerEngine {
 
   /**
    * Menelusuri alur dari Natural Language Query (FR-1.4)
-   * Contoh: "Gambarkan alur saat webhook Stripe diterima"
    */
   async traceNaturalLanguage(query, options = {}) {
     const keywords = query.toLowerCase().replace(/[^a-z0-9_\s]/g, '').split(/\s+/).filter(w => w.length > 2);
@@ -146,174 +152,104 @@ export class TracerEngine {
       });
     }
 
-    // Fallback sintetis berbasis query bahasa alami
     const profile = this.profileLoader.getProfile('generic');
     return {
       targetName: `Query: ${query}`,
+      profileUsed: profile.language,
       participants: [
         { id: 'Caller', label: 'External Source / Webhook', type: 'actor' },
-        { id: 'Handler', label: 'Webhook / API Handler', type: 'participant' },
-        { id: 'Svc', label: 'Domain Processing Service', type: 'participant' },
-        { id: 'DB', label: 'Database Storage', type: 'participant' }
+        { id: 'Handler', label: 'Webhook / API Handler', type: 'participant', layer: 'Presentation Layer' },
+        { id: 'Svc', label: 'Domain Processing Service', type: 'participant', layer: 'Domain & Application Layer' },
+        { id: 'DB', label: 'Database Storage', type: 'participant', layer: 'Persistence & Cache Layer' }
       ],
       steps: [
         { from: 'Caller', to: 'Handler', message: `Incoming Event (${query})`, isAsync: false },
-        { from: 'Handler', to: 'Svc', message: 'validateAndProcessEvent()', isAsync: false },
+        { from: 'Handler', to: 'Svc', message: 'validateAndDispatch(event)', isAsync: false },
         { from: 'Svc', to: 'DB', message: 'Persist Event & Update State', isAsync: false },
-        { from: 'DB', to: 'Svc', message: 'Success', isReturn: true },
+        { from: 'DB', to: 'Svc', message: 'Committed', isReturn: true },
         { from: 'Svc', to: 'Handler', message: 'Event Handled', isReturn: true },
-        { from: 'Handler', to: 'Caller', message: '200 OK (Acknowledged)', isReturn: true }
+        { from: 'Handler', to: 'Caller', message: '200 OK ("Acknowledged")', isReturn: true }
       ],
-      errorBranches: []
+      errorBranches: [],
+      models: []
     };
   }
 
   /**
-   * Mengekstrak body dari method tertentu dalam source code
+   * Mengekstrak body dari method tertentu dalam source code berbasis AST token-stream
    */
-  extractMethodBody(code, methodName) {
+  extractMethodBody(code, methodName, language = 'generic') {
     if (!methodName || !code) return null;
-    const cleanMethod = methodName.replace(/[()]/g, '').trim();
-
-    // Pola fungsi PHP / JS / TS / Java / C#
-    const funcRegex = new RegExp(
-      `(?:(?:public|private|protected|static|async|final)\\s+)*function\\s+${cleanMethod}\\s*\\([^)]*\\)[^{]*\\{`,
-      'i'
-    );
-    let match = funcRegex.exec(code);
-    if (!match) {
-      // Coba pola shorthand class method JS/TS: methodName(...) {
-      const classMethodRegex = new RegExp(
-        `(?:(?:public|private|protected|static|async)\\s+)*${cleanMethod}\\s*\\([^)]*\\)[^{]*\\{`,
-        'i'
-      );
-      match = classMethodRegex.exec(code);
-    }
-
-    if (!match) return null;
-
-    const openBraceIdx = match.index + match[0].length - 1;
-    return this.extractBlockByBraces(code, openBraceIdx);
-  }
-
-  /**
-   * Mencocokkan kurung kurawal pembuka dan penutup untuk mengekstrak scope blok kode
-   */
-  extractBlockByBraces(code, openBraceIdx) {
-    if (code[openBraceIdx] !== '{') return null;
-    let depth = 0;
-    let inString = null;
-
-    for (let i = openBraceIdx; i < code.length; i++) {
-      const char = code[i];
-      const prev = i > 0 ? code[i - 1] : '';
-
-      if (inString) {
-        if (char === inString && prev !== '\\') {
-          inString = null;
-        }
-        continue;
-      }
-
-      if (char === '"' || char === "'" || char === '`') {
-        inString = char;
-        continue;
-      }
-
-      if (char === '{') {
-        depth++;
-      } else if (char === '}') {
-        depth--;
-        if (depth === 0) {
-          return code.substring(openBraceIdx, i + 1);
-        }
-      }
-    }
-    return code.substring(openBraceIdx);
+    const node = this.astParser.findFunctionNode(code, methodName, language);
+    return node ? node.body : null;
   }
 
   /**
    * Menemukan pemanggilan intra-class internal ($this->method() / self::method() / this.method())
    */
   findLocalCalls(methodBody) {
-    if (!methodBody) return [];
-    const calls = [];
-
-    // PHP: $this->methodName(...) atau self::methodName(...)
-    const phpRegex = /(?:\$this->|self::|static::)([a-zA-Z0-9_]+)\s*\(/g;
-    let match;
-    while ((match = phpRegex.exec(methodBody)) !== null) {
-      if (!calls.includes(match[1])) {
-        calls.push(match[1]);
-      }
-    }
-
-    // JS/TS: this.methodName(...)
-    const jsRegex = /this\.([a-zA-Z0-9_]+)\s*\(/g;
-    while ((match = jsRegex.exec(methodBody)) !== null) {
-      if (!calls.includes(match[1])) {
-        calls.push(match[1]);
-      }
-    }
-
-    return calls;
+    return this.astParser.extractIntraClassCalls(methodBody);
   }
 
   /**
-   * Melakukan crawling rekursif terhadap private/protected method dalam class yang sama
+   * Melakukan crawling rekursif terhadap method intra-file dan lintas-file (multi-file AST)
    */
-  crawlLocalMethods(code, rootMethodName, maxDepth = 2) {
-    const visited = new Set();
-    const collectedMethods = new Map();
-
-    const traverse = (methodName, currentDepth) => {
-      if (currentDepth > maxDepth || !methodName || visited.has(methodName)) return;
-      visited.add(methodName);
-
-      const body = this.extractMethodBody(code, methodName);
-      if (body) {
-        collectedMethods.set(methodName, { body, depth: currentDepth });
-        const localCalls = this.findLocalCalls(body);
-        for (const childCall of localCalls) {
-          traverse(childCall, currentDepth + 1);
-        }
-      }
-    };
-
-    if (rootMethodName) {
-      traverse(rootMethodName, 0);
-    } else {
-      // Jika root method tidak didefinisikan secara eksplisit, cari entrypoint standar
-      const commonEntries = ['index', 'handle', '__invoke', 'show', 'store', 'execute', 'run'];
-      for (const entry of commonEntries) {
-        if (new RegExp(`(?:public\\s+)?function\\s+${entry}\\b`, 'i').test(code)) {
-          traverse(entry, 0);
-          break;
-        }
-      }
-    }
-
-    return collectedMethods;
+  crawlLocalMethods(code, rootMethodName, maxDepth = 3, filePath = null, language = 'generic') {
+    const allFiles = this.scanDirRecursive(this.rootDir);
+    const graph = this.astParser.crawlMultiFileCallGraph(filePath, code, rootMethodName, {
+      maxDepth,
+      language,
+      allFiles
+    });
+    return graph.collectedNodes;
   }
 
   /**
-   * Analisis mendalam AST & Pola Kode Sumber
+   * Analisis mendalam AST Multi-File & Penegakan Dinamis 9 Profil Bahasa (Zero-Hallucination)
    */
-  analyzeCodeContent(code, meta) {
+  analyzeCodeContent(code, meta = {}) {
     const aliases = this.config.participantsAliases || {};
     const detailLevel = meta.detailLevel || 'standard';
     const isL1 = detailLevel === 'L1' || detailLevel === 'high';
     const isL3 = detailLevel === 'L3' || detailLevel === 'deep';
 
-    // 1. Recursive Intra-Class Method Crawling
-    const targetMethod = meta.targetMethod || (meta.targetName && !meta.targetName.includes(' ') ? meta.targetName : null);
-    const crawledMethods = this.crawlLocalMethods(code, targetMethod, 2);
-    const fullCode = crawledMethods.size > 0
-      ? [code, ...Array.from(crawledMethods.values()).map(m => m.body)].join('\n')
-      : code;
+    // 1. Resolve Active Language Profile & Compiled Profile Rules
+    const detectedLang = meta.profile?.language || (meta.targetFile ? this.sniffer.detectLanguageFromPath(meta.targetFile) : 'generic');
+    const profile = meta.profile || this.profileLoader.getProfile(detectedLang);
+    const rules = this.profileLoader.compileProfileRules(profile);
 
-    const classMatch = code.match(/class\s+([a-zA-Z0-9_]+)/);
-    const baseName = classMatch ? classMatch[1] : (meta.targetFile ? path.basename(meta.targetFile, path.extname(meta.targetFile)) : 'Handler');
+    // 2. Multi-File AST Parsing & Recursive Call-Graph Crawling
+    const allFiles = this.scanDirRecursive(this.rootDir);
+    const targetMethod = meta.targetMethod || this.detectEntryMethodFromRoute(code, meta.urlPath, rules) || (meta.targetName && !meta.targetName.includes(' ') && !meta.targetName.includes('.') ? meta.targetName : null);
+
+    const callGraph = this.astParser.crawlMultiFileCallGraph(meta.targetFile, code, targetMethod, {
+      maxDepth: 3,
+      language: detectedLang,
+      allFiles
+    });
+
+    const crawledMethods = callGraph.collectedNodes;
+    const externalFileContents = callGraph.resolvedExternalFiles
+      .filter(f => fs.existsSync(f))
+      .map(f => fs.readFileSync(f, 'utf8'));
+
+    const fullCode = [
+      code,
+      ...Array.from(crawledMethods.values()).map(m => m.body),
+      ...externalFileContents
+    ].join('\n');
+
+    const combinedVariables = this.astParser.extractVariables(fullCode, detectedLang);
+
+    // 3. Identify Primary Controller / Entry Handler from AST
+    const primaryClass = callGraph.fileAst.classes[0];
+    const primaryFn = callGraph.fileAst.functions[0];
+    const baseName = primaryClass
+      ? primaryClass.name
+      : (primaryFn
+          ? primaryFn.name
+          : (meta.targetFile ? path.basename(meta.targetFile, path.extname(meta.targetFile)) : 'Handler'));
+
     const ctrlId = 'Ctrl';
     const ctrlLabel = aliases[baseName] || aliases['Ctrl'] || baseName;
 
@@ -324,296 +260,863 @@ export class TracerEngine {
     const steps = [];
     const errorBranches = [];
 
-    // Request awal
-    const reqLabel = meta.endpoint ? meta.endpoint : (meta.targetName || 'invoke');
+    const reqLabel = meta.endpoint ? meta.endpoint : (meta.targetName || (primaryFn ? `${primaryFn.name}(${primaryFn.params})` : 'invoke'));
     steps.push({ from: 'Client', to: ctrlId, message: `${reqLabel}`, isAsync: false });
 
-    // 2. Deteksi Infrastructure Stereotypes
-    const hasAuth = /Auth::|auth\(\)->|request->user|req\.user/i.test(fullCode);
-    const hasCache = /Redis::|Cache::|redisClient|redis\./i.test(fullCode);
-    const hasS3 = /S3Helper|Storage::disk\(['"]s3['"]\)|Aws\\S3|getObjectContent|s3Client/i.test(fullCode);
-    const hasValidation = /validate|guard|verify|check|required/i.test(code);
+    // 4. Enforce Profile Infrastructure Stereotypes & Middleware Rules
+    const infra = rules.infrastructure || {};
+    const matchesAnyPattern = (patterns = [], text = fullCode) =>
+      patterns.some(pat => {
+        try {
+          return new RegExp(pat, 'i').test(text);
+        } catch {
+          return false;
+        }
+      });
 
-    // Deteksi model Eloquent spesifik
+    const hasAuth = matchesAnyPattern(infra.authentication?.patterns || [], fullCode) ||
+      /Auth::|auth\(\)->|request->user|req\.user|Depends\(get_current_user\)|@PreAuthorize|\[Authorize/i.test(fullCode);
+
+    const hasCache = matchesAnyPattern(infra.cache?.patterns || [], fullCode) ||
+      /Redis::|Cache::|redisClient|redis\./i.test(fullCode);
+
+    const hasS3 = matchesAnyPattern(infra.cloud_storage?.patterns || [], fullCode) ||
+      /S3Helper|Storage::disk\(['"]s3['"]\)|Aws\\S3|getObjectContent|s3Client/i.test(fullCode);
+
+    const hasMiddleware = rules.middlewareRegexes.some(rx => {
+      rx.lastIndex = 0;
+      return rx.test(code);
+    });
+    const hasValidation = hasMiddleware || /validate|ShouldBindJSON|guard|verify|check|required/i.test(code);
+
+    // 5. Extract Real Database / ORM Models Enforcing profile.database.queryMethods
+    const queryMethodsPattern = rules.queryMethods.length > 0
+      ? rules.queryMethods.map(m => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+      : 'where|find|findOrFail|first|firstOrFail|create|update|query|all|save';
+
     const modelMatches = [];
-    const modelRegex = /\b([A-Z][a-zA-Z0-9_]+)::(?:where|find|findOrFail|first|firstOrFail|create|update|query|all)\b/g;
+    const modelQueriesMap = new Map();
     const standardFacades = new Set([
       'Route', 'Redis', 'Cache', 'Storage', 'Http', 'Auth', 'Log', 'Response',
-      'DB', 'Config', 'Schema', 'Artisan', 'Event', 'Queue', 'Validator', 'Str', 'Arr', 'App'
+      'DB', 'Config', 'Schema', 'Artisan', 'Event', 'Queue', 'Validator', 'Str', 'Arr', 'App',
+      'S3Helper', 'ResponseEntity', 'NextResponse', 'Promise', 'Object', 'JSON', 'Math'
     ]);
+
+    const staticModelRegex = new RegExp(
+      `(?:(\\$?[a-zA-Z0-9_]+)\\s*=\\s*)?\\b([A-Z][a-zA-Z0-9_]+)::(?:${queryMethodsPattern})\\b([^;\\n]*)`,
+      'g'
+    );
     let mMatch;
-    while ((mMatch = modelRegex.exec(fullCode)) !== null) {
-      const modelName = mMatch[1];
-      if (!standardFacades.has(modelName) && !modelMatches.includes(modelName)) {
-        modelMatches.push(modelName);
+    while ((mMatch = staticModelRegex.exec(fullCode)) !== null) {
+      const assignedVar = mMatch[1] ? mMatch[1].trim() : null;
+      const modelName = mMatch[2].trim();
+      const fullChainMatch = mMatch[0].replace(/^\$?[a-zA-Z0-9_]+\s*=\s*/, '').replace(`${modelName}::`, '').replace(/\s+/g, ' ').trim();
+
+      if (
+        !standardFacades.has(modelName) &&
+        !modelName.endsWith('Service') &&
+        !modelName.endsWith('Gateway') &&
+        !modelName.endsWith('Queue') &&
+        !modelName.endsWith('Controller')
+      ) {
+        if (!modelMatches.includes(modelName)) {
+          modelMatches.push(modelName);
+        }
+        if (!modelQueriesMap.has(modelName)) {
+          modelQueriesMap.set(modelName, []);
+        }
+        modelQueriesMap.get(modelName).push({
+          assignedVar,
+          chain: fullChainMatch,
+          isFailOnMissing: /firstOrFail|findOrFail/i.test(fullChainMatch)
+        });
       }
     }
 
-    // 3. Bangun Daftar Partisipan dengan Layer Arsitektur
+    // 6. Register Discovered Participants into Architectural Layers
     if (hasAuth && !isL1) {
-      participants.push({ id: 'Auth', label: aliases['Auth'] || 'Auth Service', type: 'participant', layer: 'Application Layer' });
+      const authParticipant = infra.authentication?.participant || {};
+      participants.push({
+        id: authParticipant.id || 'Auth',
+        label: aliases['Auth'] || authParticipant.alias || 'Auth Service',
+        type: 'participant',
+        layer: authParticipant.layer || 'Application Layer'
+      });
     }
 
-    let primaryModelId = null;
-    let compiledModelId = null;
-    if (modelMatches.length > 0) {
-      primaryModelId = 'CampaignModel';
+    const primaryModelName = modelMatches[0] || null;
+    const secondaryModelName = modelMatches[1] || null;
+
+    if (primaryModelName) {
       participants.push({
-        id: primaryModelId,
-        label: aliases[modelMatches[0]] || modelMatches[0],
+        id: primaryModelName,
+        label: aliases[primaryModelName] || primaryModelName,
         type: 'participant',
         layer: 'Persistence & Cache Layer'
       });
-      if (modelMatches.length > 1) {
-        compiledModelId = 'CompiledModel';
-      }
     }
 
     if (hasCache) {
+      const cacheParticipant = infra.cache?.participant || {};
       participants.push({
-        id: 'Redis',
-        label: aliases['Redis'] || 'Redis Cache',
+        id: cacheParticipant.id || 'Redis',
+        label: aliases['Redis'] || cacheParticipant.alias || 'Redis Cache',
         type: 'participant',
-        layer: 'Persistence & Cache Layer'
+        layer: cacheParticipant.layer || 'Persistence & Cache Layer'
       });
     }
 
-    if (compiledModelId) {
+    if (secondaryModelName) {
       participants.push({
-        id: compiledModelId,
-        label: aliases[modelMatches[1]] || modelMatches[1],
+        id: secondaryModelName,
+        label: aliases[secondaryModelName] || secondaryModelName,
         type: 'participant',
         layer: 'Persistence & Cache Layer'
       });
     }
 
     if (hasS3) {
+      const s3Participant = infra.cloud_storage?.participant || {};
       participants.push({
-        id: 'S3',
-        label: aliases['S3'] || 'S3Helper (AWS S3)',
+        id: s3Participant.id || 'S3',
+        label: aliases['S3'] || s3Participant.alias || 'S3Helper (AWS S3)',
         type: 'participant',
-        layer: 'Cloud Storage'
+        layer: s3Participant.layer || 'Cloud Storage'
       });
     }
 
-    // Deteksi Service Layer jika non-Laravel atau standar microservice
-    const serviceMatch = fullCode.match(/([a-zA-Z0-9_]+(?:Service|UseCase|Manager|Handler))\b/);
+    // Extract Domain Services dynamically from AST fields, imports, and call sites
+    const serviceCalls = this.extractServiceCallsFromAst(fullCode, callGraph, baseName);
     let serviceId = null;
-    if (serviceMatch && serviceMatch[1] !== baseName) {
+    if (serviceCalls.length > 0) {
+      const primarySvcName = serviceCalls[0].serviceClass;
       serviceId = 'Svc';
       participants.push({
         id: serviceId,
-        label: aliases[serviceMatch[1]] || serviceMatch[1],
+        label: aliases[primarySvcName] || primarySvcName,
         type: 'participant',
         layer: 'Application Layer'
       });
     }
 
-    // Deteksi Panggilan Eksternal HTTP
-    const hasHttpCall = /axios|fetch\s*\(|(?<![\\a-zA-Z0-9_])http\.(?:get|post|put|delete|request)|Http::(?:get|post|put|delete|withHeaders)|requests\.|reqwest|httpClient|client\.Do|Guzzle|PaymentGateway/i.test(fullCode);
+    // Detect External HTTP / Gateway Calls using profile.externalCalls & AST
+    const extCallInfo = this.extractExternalGatewayCall(fullCode, rules);
     let extId = null;
-    if (hasHttpCall && !hasCache) {
+    if (extCallInfo && !hasCache) {
       extId = 'ExtAPI';
       participants.push({
         id: extId,
-        label: aliases['ExtAPI'] || 'External Gateway / API',
+        label: aliases['ExtAPI'] || extCallInfo.label,
         type: 'participant',
         layer: 'External Services'
       });
     }
 
-    // Deteksi DB generic jika tidak ada model spesifik
-    const hasDb = /db\.|repository|database|query|insert|select|update|delete|find|save|commit/i.test(fullCode);
-    let dbId = primaryModelId;
-    if (!dbId && hasDb) {
+    // Detect Generic / Session DB Calls (e.g. SQLAlchemy db.query, GORM, Prisma, TypeORM)
+    const dbCallInfo = this.extractDatabaseOperations(fullCode, rules);
+    let dbId = primaryModelName;
+    if (!dbId && dbCallInfo) {
       dbId = 'DB';
       participants.push({
         id: dbId,
-        label: aliases['DB'] || 'Database (Storage / ORM)',
+        label: aliases['DB'] || dbCallInfo.label,
         type: 'participant',
         layer: 'Persistence & Cache Layer'
       });
     }
 
-    // Deteksi Message Queue / Async Events
-    const hasQueue = /queue|broker|publish|kafka|rabbitmq|sqs|event|emit/i.test(fullCode);
+    // Detect Message Broker / Async Event Queue using profile.controlFlow.asyncWorkflow
+    const queueCallInfo = this.extractQueueOperations(fullCode, rules);
     let queueId = null;
-    if (hasQueue) {
+    if (queueCallInfo) {
       queueId = 'Queue';
       participants.push({
         id: queueId,
-        label: aliases['Queue'] || 'Message Broker (Kafka / Queue)',
+        label: aliases['Queue'] || queueCallInfo.label,
         type: 'participant',
         layer: 'Messaging & Events'
       });
     }
 
-    // 4. Bangun Langkah-Langkah Eksekusi (Steps)
-    // Step 4.1: Validasi Request
-    if (hasValidation && !isL1) {
-      steps.push({ from: ctrlId, to: ctrlId, message: '$request->validate(...)', isAsync: false });
-      steps.push({ type: 'alt_start', condition: 'Validasi Gagal' });
-      steps.push({ from: ctrlId, to: 'Client', message: '422 Unprocessable Entity', isReturn: true });
-      steps.push({ type: 'alt_else', condition: 'Validasi Lolos (Happy Path)' });
-      errorBranches.push({ type: 'ValidationException', status: 422, message: 'Invalid payload or query parameters' });
+    // 7. Reconstruct Execution Steps Directly from Extracted Source Symbols (Zero Hallucination)
+    // Step 7.1: Input Validation & Early Guard Returns
+    const validationExpr = this.extractValidationExpression(code, rules);
+    if (validationExpr && !isL1) {
+      steps.push({ from: ctrlId, to: ctrlId, message: validationExpr.callLabel, isAsync: false });
+      steps.push({ type: 'alt_start', condition: validationExpr.failCondition });
+      steps.push({ from: ctrlId, to: 'Client', message: validationExpr.failResponse, isReturn: true });
+      steps.push({ type: 'alt_else', condition: validationExpr.passCondition });
+      errorBranches.push({
+        type: validationExpr.exceptionType,
+        status: validationExpr.statusCode,
+        message: validationExpr.errorMessage
+      });
     }
 
-    // Step 4.2: Auth & Identity Resolution
+    // Step 7.2: Auth & Identity Resolution
     if (hasAuth && !isL1) {
-      steps.push({ from: ctrlId, to: 'Auth', message: 'Auth::user()', isAsync: false });
-      steps.push({ from: 'Auth', to: ctrlId, message: '$user (resolve businessId)', isReturn: true });
+      const authInfo = this.extractAuthCallDetails(fullCode);
+      steps.push({ from: ctrlId, to: 'Auth', message: authInfo.callExpr, isAsync: false });
+      steps.push({ from: 'Auth', to: ctrlId, message: authInfo.returnExpr, isReturn: true });
     }
 
-    // Step 4.3: Verifikasi Primary Model & ORM Exception Handling
-    if (primaryModelId) {
-      const hasFirstOrFail = /firstOrFail|findOrFail/i.test(fullCode);
-      if (hasFirstOrFail && !isL1) {
-        steps.push({ from: ctrlId, to: primaryModelId, message: "where('id', campaignId)->firstOrFail()", isAsync: false });
-        steps.push({ type: 'alt_start', condition: 'Campaign Not Found (ModelNotFoundException)' });
-        steps.push({ from: primaryModelId, to: ctrlId, message: 'ModelNotFoundException', isReturn: true });
+    // Step 7.3: Primary Model Verification & Exception Handling
+    if (primaryModelName) {
+      const primaryQueries = modelQueriesMap.get(primaryModelName) || [];
+      const firstQuery = primaryQueries[0] || { assignedVar: '$entity', chain: 'find()', isFailOnMissing: false };
+      const returnVar = firstQuery.assignedVar || `$${primaryModelName.charAt(0).toLowerCase() + primaryModelName.slice(1)}`;
+
+      if (firstQuery.isFailOnMissing && !isL1) {
+        steps.push({ from: ctrlId, to: primaryModelName, message: firstQuery.chain, isAsync: false });
+        steps.push({ type: 'alt_start', condition: `${primaryModelName} Not Found (ModelNotFoundException)` });
+        steps.push({ from: primaryModelName, to: ctrlId, message: 'ModelNotFoundException', isReturn: true });
         steps.push({ from: ctrlId, to: 'Client', message: '404 Not Found', isReturn: true });
-        steps.push({ type: 'alt_else', condition: 'Campaign Valid' });
-        steps.push({ from: primaryModelId, to: ctrlId, message: '$campaign', isReturn: true });
+        steps.push({ type: 'alt_else', condition: `${primaryModelName} Valid` });
+        steps.push({ from: primaryModelName, to: ctrlId, message: returnVar, isReturn: true });
         steps.push({ type: 'alt_end' });
-        errorBranches.push({ type: 'ModelNotFoundException', status: 404, message: 'Requested model entity not found' });
+        errorBranches.push({ type: 'ModelNotFoundException', status: 404, message: `${primaryModelName} entity not found` });
       } else {
-        steps.push({ from: ctrlId, to: primaryModelId, message: 'fetchCampaign(campaignId)', isAsync: false });
-        steps.push({ from: primaryModelId, to: ctrlId, message: '$campaign', isReturn: true });
+        steps.push({ from: ctrlId, to: primaryModelName, message: firstQuery.chain, isAsync: false });
+        steps.push({ from: primaryModelName, to: ctrlId, message: returnVar, isReturn: true });
       }
     }
 
-    // Step 4.4: Pola Cache-Aside & Invalidation (Jika Redis/Cache Digunakan)
+    // Step 7.4: Cache-Aside & Cloud Storage Flow (Dynamically Extracted from AST)
     if (hasCache) {
-      const hasHdel = /hdel|forget|tags/i.test(fullCode);
-      const hasReloadParam = /reload|force/i.test(fullCode);
+      const cacheDetails = this.extractCacheOperationsFromAst(fullCode, combinedVariables);
 
-      if ((hasHdel || hasReloadParam) && !isL1) {
-        steps.push({ type: 'alt_start', condition: 'reload == true' });
-        steps.push({ from: ctrlId, to: 'Redis', message: 'hdel("ayowrap_{campaignId}", businessId)', isAsync: false });
+      if (cacheDetails.invalidationCall && !isL1) {
+        steps.push({ type: 'alt_start', condition: cacheDetails.invalidationCondition });
+        steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.invalidationCall, isAsync: false });
         steps.push({ from: 'Redis', to: ctrlId, message: 'deleted', isReturn: true });
-        steps.push({ type: 'alt_else', condition: 'reload == false (Default)' });
-        steps.push({ from: ctrlId, to: 'Redis', message: 'hget("ayowrap_{campaignId}", businessId)', isAsync: false });
-        steps.push({ from: 'Redis', to: ctrlId, message: '$raw', isReturn: true });
+        steps.push({ type: 'alt_else', condition: cacheDetails.defaultReadCondition });
+        steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.readCall, isAsync: false });
+        steps.push({ from: 'Redis', to: ctrlId, message: cacheDetails.readReturnVar, isReturn: true });
         steps.push({ type: 'alt_end' });
       } else {
-        steps.push({ from: ctrlId, to: 'Redis', message: 'hget("ayowrap_{campaignId}", businessId)', isAsync: false });
-        steps.push({ from: 'Redis', to: ctrlId, message: '$raw', isReturn: true });
+        steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.readCall, isAsync: false });
+        steps.push({ from: 'Redis', to: ctrlId, message: cacheDetails.readReturnVar, isReturn: true });
       }
 
       if (isL3) {
-        steps.push({ type: 'note', over: `${ctrlId},Redis`, text: 'Key: ayowrap_{campaignId} | Field: (string) businessId', level: 'L3' });
+        steps.push({
+          type: 'note',
+          over: `${ctrlId},Redis`,
+          text: `Key: ${cacheDetails.resolvedKey} | Field: ${cacheDetails.resolvedField}`,
+          level: 'L3'
+        });
       }
 
-      // Percabangan Cache HIT vs Cache MISS
-      steps.push({ type: 'alt_start', condition: 'Cache HIT ($raw ada)' });
-      if (!isL1) {
-        steps.push({ from: ctrlId, to: ctrlId, message: 'processRedisData(raw, user, campaign)', isAsync: false });
+      // Cache HIT vs Cache MISS Branching
+      steps.push({ type: 'alt_start', condition: `Cache HIT (${cacheDetails.readReturnVar} ada)` });
+      if (!isL1 && cacheDetails.hitHelperCall) {
+        steps.push({ from: ctrlId, to: ctrlId, message: cacheDetails.hitHelperCall, isAsync: false });
       }
-      steps.push({ from: ctrlId, to: 'Client', message: '200 OK (data: user, slides - from cache)', isReturn: true });
+      steps.push({ from: ctrlId, to: 'Client', message: cacheDetails.hitResponseLabel, isReturn: true });
 
-      steps.push({ type: 'alt_else', condition: 'Cache MISS (Ambil dari DB & S3)' });
+      steps.push({ type: 'alt_else', condition: 'Cache MISS (Ambil dari DB & Cloud Storage)' });
 
-      // Ambil dari compiled model DB jika ada
-      if (compiledModelId) {
-        steps.push({ from: ctrlId, to: compiledModelId, message: 'where(campaign_id, retailer_id)->first()', isAsync: false });
-        steps.push({ from: compiledModelId, to: ctrlId, message: '$record', isReturn: true });
+      if (secondaryModelName) {
+        const secQueries = modelQueriesMap.get(secondaryModelName) || [];
+        const secQuery = secQueries[0] || { assignedVar: '$record', chain: 'first()' };
+        steps.push({ from: ctrlId, to: secondaryModelName, message: secQuery.chain, isAsync: false });
+        steps.push({ from: secondaryModelName, to: ctrlId, message: secQuery.assignedVar || '$record', isReturn: true });
       }
 
-      // Ambil dari S3 Cloud Storage jika ada
       if (hasS3) {
+        const s3Details = this.extractS3OperationsFromAst(fullCode);
         if (!isL1) {
-          steps.push({ type: 'alt_start', condition: '$record tidak ditemukan / s3_path kosong' });
-          steps.push({ from: ctrlId, to: ctrlId, message: 'getFallbackResponse()', isAsync: false });
+          steps.push({ type: 'alt_start', condition: s3Details.missingRecordCondition });
+          if (s3Details.fallbackCall) {
+            steps.push({ from: ctrlId, to: ctrlId, message: s3Details.fallbackCall, isAsync: false });
+          }
           steps.push({ from: ctrlId, to: 'Client', message: '200 OK (fallback empty)', isReturn: true });
 
-          steps.push({ type: 'alt_else', condition: '$record siap & s3_path valid' });
-          steps.push({ from: ctrlId, to: 'S3', message: 'connect() & getObjectContent(record->s3_path)', isAsync: false });
+          steps.push({ type: 'alt_else', condition: s3Details.validRecordCondition });
+          steps.push({ from: ctrlId, to: 'S3', message: s3Details.s3CallExpr, isAsync: false });
           if (isL3) {
-            steps.push({ type: 'note', over: `${ctrlId},S3`, text: 'S3 Path: record->s3_path', level: 'L3' });
+            steps.push({ type: 'note', over: `${ctrlId},S3`, text: `S3 Path: ${s3Details.s3PathExpr}`, level: 'L3' });
           }
 
           steps.push({ type: 'alt_start', condition: 'S3 Gagal / Exception' });
-          steps.push({ from: 'S3', to: ctrlId, message: 'Error (log_exception)', isReturn: true });
+          steps.push({ from: 'S3', to: ctrlId, message: 'Error (Exception)', isReturn: true });
           steps.push({ from: ctrlId, to: 'Client', message: '200 OK (fallback empty)', isReturn: true });
 
           steps.push({ type: 'alt_else', condition: 'S3 Berhasil' });
-          steps.push({ from: 'S3', to: ctrlId, message: 'jsonContent', isReturn: true });
-          steps.push({ from: ctrlId, to: ctrlId, message: 'Extract $retailerData', isAsync: false });
-          steps.push({ from: ctrlId, to: 'Redis', message: 'hset("ayowrap_{campaignId}", businessId, responseData)', isAsync: false });
+          steps.push({ from: 'S3', to: ctrlId, message: s3Details.s3ReturnVar, isReturn: true });
+          if (s3Details.transformExpr) {
+            steps.push({ from: ctrlId, to: ctrlId, message: s3Details.transformExpr, isAsync: false });
+          }
+          steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.writeCall, isAsync: false });
 
-          if (fullCode.includes('expire') || fullCode.includes('ttl')) {
+          if (cacheDetails.expireCall) {
             steps.push({ type: 'opt_start', condition: 'Key belum memiliki TTL' });
-            steps.push({ from: ctrlId, to: 'Redis', message: 'expire("ayowrap_{campaignId}", ttl)', isAsync: false });
+            steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.expireCall, isAsync: false });
             steps.push({ type: 'opt_end' });
             if (isL3) {
-              steps.push({ type: 'note', over: `${ctrlId},Redis`, text: 'TTL: diffInSeconds(campaign->end_date)', level: 'L3' });
+              steps.push({ type: 'note', over: `${ctrlId},Redis`, text: `TTL: ${cacheDetails.ttlExpr}`, level: 'L3' });
             }
           }
 
           steps.push({ from: 'Redis', to: ctrlId, message: 'OK', isReturn: true });
-          steps.push({ from: ctrlId, to: 'Client', message: '200 OK (data: user, slides)', isReturn: true });
-          steps.push({ type: 'alt_end' }); // end S3 Gagal vs Berhasil
-          steps.push({ type: 'alt_end' }); // end record valid
+          steps.push({ from: ctrlId, to: 'Client', message: cacheDetails.missResponseLabel, isReturn: true });
+          steps.push({ type: 'alt_end' });
+          steps.push({ type: 'alt_end' });
         } else {
-          steps.push({ from: ctrlId, to: 'S3', message: 'getObjectContent(s3_path)', isAsync: false });
-          steps.push({ from: 'S3', to: ctrlId, message: 'jsonContent', isReturn: true });
-          steps.push({ from: ctrlId, to: 'Redis', message: 'hset(key, field, data)', isAsync: false });
-          steps.push({ from: ctrlId, to: 'Client', message: '200 OK (data: user, slides)', isReturn: true });
+          steps.push({ from: ctrlId, to: 'S3', message: s3Details.s3CallExpr, isAsync: false });
+          steps.push({ from: 'S3', to: ctrlId, message: s3Details.s3ReturnVar, isReturn: true });
+          steps.push({ from: ctrlId, to: 'Redis', message: cacheDetails.writeCall, isAsync: false });
+          steps.push({ from: ctrlId, to: 'Client', message: cacheDetails.missResponseLabel, isReturn: true });
         }
       }
 
-      steps.push({ type: 'alt_end' }); // end Cache HIT vs MISS
+      steps.push({ type: 'alt_end' });
     } else {
-      // Alur standar untuk service non-cache (e.g. Express, Spring Boot, Gin, FastAPI)
-      if (serviceId) {
-        steps.push({ from: ctrlId, to: serviceId, message: isL3 ? 'processRequest(payload, context)' : 'processRequest(payload)', isAsync: false });
+      // Standard Multi-Layer Service / Repository / Gateway / Queue Flow
+      if (serviceId && serviceCalls.length > 0) {
+        for (const call of serviceCalls) {
+          steps.push({
+            from: ctrlId,
+            to: serviceId,
+            message: `${call.method}(${call.args})`,
+            isAsync: false
+          });
+          if (call.assignedVar) {
+            steps.push({
+              from: serviceId,
+              to: ctrlId,
+              message: call.assignedVar,
+              isReturn: true
+            });
+          }
+        }
       }
 
-      if (extId) {
-        steps.push({ from: serviceId || ctrlId, to: extId, message: 'POST /v1/authorize (External)', isAsync: false });
-        steps.push({ from: extId, to: serviceId || ctrlId, message: '200 OK (Response)', isReturn: true });
+      if (extId && extCallInfo) {
+        steps.push({ from: serviceId || ctrlId, to: extId, message: extCallInfo.callExpr, isAsync: false });
+        steps.push({ from: extId, to: serviceId || ctrlId, message: extCallInfo.returnVar || '200 OK (Response)', isReturn: true });
       }
 
-      if (dbId && !primaryModelId) {
-        steps.push({ from: serviceId || ctrlId, to: dbId, message: 'Save / Query Transaction Record', isAsync: false });
-        steps.push({ from: dbId, to: serviceId || ctrlId, message: 'DB Commit Success', isReturn: true });
+      if (dbId && !primaryModelName && dbCallInfo) {
+        for (const op of dbCallInfo.operations) {
+          steps.push({ from: serviceId || ctrlId, to: dbId, message: op, isAsync: false });
+        }
+        steps.push({ from: dbId, to: serviceId || ctrlId, message: dbCallInfo.returnLabel, isReturn: true });
       }
 
-      if (queueId) {
-        steps.push({ from: ctrlId, to: queueId, message: 'publish("event.completed", payload)', isAsync: true });
+      if (queueId && queueCallInfo) {
+        steps.push({ from: ctrlId, to: queueId, message: queueCallInfo.callExpr, isAsync: true });
       }
 
-      steps.push({ from: ctrlId, to: 'Client', message: '200 OK / 201 Created (Success Payload)', isReturn: true });
+      const successResp = this.extractSuccessResponse(code, rules);
+      steps.push({ from: ctrlId, to: 'Client', message: successResp, isReturn: true });
     }
 
-    if (hasValidation && !isL1) {
-      steps.push({ type: 'alt_end' }); // Tutup blok validasi lolos
+    if (validationExpr && !isL1) {
+      steps.push({ type: 'alt_end' });
     }
 
-    const hasTryCatch = /try\s*\{|if\s+err\s*!=\s*nil|catch|rescue|except/i.test(fullCode);
-    if (hasTryCatch && errorBranches.length === 0) {
-      errorBranches.push({ type: 'InternalException', status: 500, message: 'Internal Server Error' });
+    // 8. Extract Real Error Pathways Enforcing profile.controlFlow.errorHandling
+    const extractedErrors = this.extractErrorPathways(fullCode, rules);
+    for (const err of extractedErrors) {
+      if (!errorBranches.some(e => e.type === err.type && e.status === err.status)) {
+        errorBranches.push(err);
+      }
     }
+
+    // 9. Extract Real Domain Classes / Models from AST for Class Diagram Synthesis
+    const models = this.extractModelsForClassDiagram(callGraph, modelMatches, participants, steps);
 
     return {
       endpoint: meta.endpoint,
-      targetName: meta.targetName,
+      targetName: meta.targetName || baseName,
       targetFile: meta.targetFile,
+      profileUsed: profile.language,
+      resolvedFiles: [meta.targetFile, ...callGraph.resolvedExternalFiles].filter(Boolean),
       participants,
       steps,
-      errorBranches
+      errorBranches,
+      models
     };
   }
 
   /**
-   * Pencarian file yang mengandung pola endpoint di repository
+   * Detect entrypoint method name from route decorators/definitions using profile rules
+   */
+  detectEntryMethodFromRoute(code, urlPath, rules) {
+    if (!urlPath || !code) return null;
+    const cleanSegment = urlPath.split('/').filter(Boolean).pop() || '';
+    if (!cleanSegment) return null;
+
+    const lines = code.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(cleanSegment)) {
+        const snippet = lines.slice(i, i + 6).join('\n');
+        const fnMatch = snippet.match(/(?:function|def|fn|func|public\s+[A-Za-z0-9_<>?]+)\s+([a-zA-Z0-9_]+)\s*\(/);
+        if (fnMatch) return fnMatch[1];
+      }
+    }
+    return null;
+  }
+
+  extractValidationExpression(code, rules) {
+    // 1. Laravel $request->validate([...])
+    if (/\$request->validate\s*\(/.test(code)) {
+      return {
+        callLabel: '$request->validate(...)',
+        failCondition: 'Validasi Gagal',
+        failResponse: '422 Unprocessable Entity',
+        passCondition: 'Validasi Lolos (Happy Path)',
+        exceptionType: 'ValidationException',
+        statusCode: 422,
+        errorMessage: 'Unprocessable Entity (Validation Failed)'
+      };
+    }
+
+    // 2. Go Gin ShouldBindJSON
+    const ginBind = code.match(/if\s+err\s*:=\s*([a-zA-Z0-9_]+\.ShouldBind[A-Za-z]*\([^)]+\))\s*;\s*err\s*!=\s*nil/);
+    if (ginBind) {
+      return {
+        callLabel: ginBind[1],
+        failCondition: 'err != nil (Invalid Request Body)',
+        failResponse: '400 Bad Request',
+        passCondition: 'Payload Valid',
+        exceptionType: 'BindValidationException',
+        statusCode: 400,
+        errorMessage: 'Invalid request body'
+      };
+    }
+
+    // 3. Express / FastAPI early validation guard: if (!items || ...) return res.status(400)...
+    const earlyGuard = code.match(/if\s*\(([^)]+)\)\s*\{\s*return\s+res\.status\((\d+)\)\.json\(\{\s*error:\s*["']([^"']+)["']/);
+    if (earlyGuard) {
+      return {
+        callLabel: `validate(${earlyGuard[1].trim()})`,
+        failCondition: earlyGuard[1].trim(),
+        failResponse: `${earlyGuard[2]} Bad Request ("${earlyGuard[3]}")`,
+        passCondition: 'Validasi Lolos (Happy Path)',
+        exceptionType: 'ValidationException',
+        statusCode: Number(earlyGuard[2]),
+        errorMessage: earlyGuard[3]
+      };
+    }
+
+    return null;
+  }
+
+  extractAuthCallDetails(fullCode) {
+    if (/Auth::user\(\)/.test(fullCode)) {
+      const hasBizId = /business_id/.test(fullCode);
+      return {
+        callExpr: 'Auth::user()',
+        returnExpr: hasBizId ? '$user (resolve businessId)' : '$user'
+      };
+    }
+    if (/Depends\(get_current_user\)/.test(fullCode)) {
+      return {
+        callExpr: 'Depends(get_current_user)',
+        returnExpr: 'user'
+      };
+    }
+    return {
+      callExpr: 'authenticateRequest()',
+      returnExpr: 'authenticatedUser'
+    };
+  }
+
+  /**
+   * Extract Redis / Cache operations and resolve variable names dynamically from AST
+   */
+  extractCacheOperationsFromAst(fullCode, variablesMap) {
+    const normalizeExpr = (raw) => {
+      if (!raw) return 'key';
+      let cleaned = raw.trim().replace(/^\(string\)\s*/, '');
+      const varLookup = cleaned.replace(/^\$/, '');
+      if (variablesMap && variablesMap.has(varLookup)) {
+        const val = variablesMap.get(varLookup);
+        if (/^["'`]/.test(val)) {
+          return val.replace(/\{\$([a-zA-Z0-9_]+)\}/g, '{$1}');
+        }
+      }
+      return cleaned.replace(/^\$/, '');
+    };
+
+    // Match hdel / forget
+    let invalidationCall = null;
+    let invalidationCondition = 'reload == true';
+    const hdelMatch = fullCode.match(/Redis::(hdel|del|forget)\s*\(\s*([^,)]+)(?:\s*,\s*([^)]+))?\s*\)/);
+    if (hdelMatch) {
+      const keyExpr = normalizeExpr(hdelMatch[2]);
+      const fieldExpr = hdelMatch[3] ? normalizeExpr(hdelMatch[3]) : null;
+      invalidationCall = fieldExpr ? `${hdelMatch[1]}(${keyExpr}, ${fieldExpr})` : `${hdelMatch[1]}(${keyExpr})`;
+    }
+
+    // Match hget / get
+    let readCall = 'get(cacheKey)';
+    let readReturnVar = '$cached';
+    let resolvedKey = 'cacheKey';
+    let resolvedField = 'field';
+    const hgetMatch = fullCode.match(/(?:(\$?[a-zA-Z0-9_]+)\s*=\s*)?(?:Redis|Cache)::(hget|get)\s*\(\s*([^,)]+)(?:\s*,\s*([^)]+))?\s*\)/);
+    if (hgetMatch) {
+      readReturnVar = hgetMatch[1] ? hgetMatch[1].trim() : '$raw';
+      const op = hgetMatch[2];
+      resolvedKey = normalizeExpr(hgetMatch[3]).replace(/^["']|["']$/g, '');
+      const quotedKey = normalizeExpr(hgetMatch[3]);
+      resolvedField = hgetMatch[4] ? `(string) ${normalizeExpr(hgetMatch[4])}` : 'default';
+      const cleanField = hgetMatch[4] ? normalizeExpr(hgetMatch[4]) : null;
+      readCall = cleanField ? `${op}(${quotedKey}, ${cleanField})` : `${op}(${quotedKey})`;
+    }
+
+    // Match hit helper call (e.g. $this->processRedisData($raw, $user, $campaign))
+    let hitHelperCall = null;
+    const hitHelperMatch = fullCode.match(/\$this->([a-zA-Z0-9_]+)\s*\(\s*\$raw\b([^)]*)\)/);
+    if (hitHelperMatch) {
+      const rawArgs = ['raw', ...hitHelperMatch[2].split(',').map(s => s.replace(/^\s*\$/, '').trim()).filter(Boolean)].join(', ');
+      hitHelperCall = `${hitHelperMatch[1]}(${rawArgs})`;
+    }
+
+    // Match hset / set
+    let writeCall = 'set(cacheKey, responseData)';
+    const hsetMatch = fullCode.match(/(?:Redis|Cache)::(hset|set|put)\s*\(\s*([^,]+)\s*,\s*([^,]+)(?:\s*,\s*([^)]+))?\s*\)/);
+    if (hsetMatch) {
+      const op = hsetMatch[1];
+      const k = normalizeExpr(hsetMatch[2]);
+      const f = normalizeExpr(hsetMatch[3]);
+      writeCall = hsetMatch[4] ? `${op}(${k}, ${f}, responseData)` : `${op}(${k}, ${f})`;
+    }
+
+    // Match expire / ttl
+    let expireCall = null;
+    let ttlExpr = 'ttl';
+    const expireMatch = fullCode.match(/Redis::expire\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/);
+    if (expireMatch) {
+      const k = normalizeExpr(expireMatch[1]);
+      const t = expireMatch[2].trim().replace(/^\$/, '');
+      expireCall = `expire(${k}, ${t})`;
+      const resolvedTtlVal = variablesMap && variablesMap.has(t) ? variablesMap.get(t) : null;
+      ttlExpr = resolvedTtlVal ? `${t} (${resolvedTtlVal})` : t;
+    }
+
+    // Extract response keys from associative array return ['key1' => $val1, 'key2' => $val2]
+    const returnKeys = [];
+    const arrayKeyRegex = /['"]([a-zA-Z0-9_]+)['"]\s*=>\s*\$[a-zA-Z0-9_]+/g;
+    let rkMatch;
+    while ((rkMatch = arrayKeyRegex.exec(fullCode)) !== null) {
+      if (!returnKeys.includes(rkMatch[1])) returnKeys.push(rkMatch[1]);
+    }
+    const keysSummary = returnKeys.length > 0 ? `data: ${returnKeys.join(', ')}` : 'data';
+
+    return {
+      invalidationCondition,
+      defaultReadCondition: 'reload == false (Default)',
+      invalidationCall,
+      readCall,
+      readReturnVar,
+      resolvedKey,
+      resolvedField,
+      hitHelperCall,
+      hitResponseLabel: `200 OK (${keysSummary} - from cache)`,
+      writeCall,
+      expireCall,
+      ttlExpr,
+      missResponseLabel: `200 OK (${keysSummary})`
+    };
+  }
+
+  /**
+   * Extract Cloud Storage (S3) operations dynamically from AST
+   */
+  extractS3OperationsFromAst(fullCode) {
+    let fallbackCall = null;
+    const fbMatch = fullCode.match(/\$this->([a-zA-Z0-9_]*Fallback[a-zA-Z0-9_]*)\s*\(\)/i);
+    if (fbMatch) {
+      fallbackCall = `${fbMatch[1]}()`;
+    }
+
+    const emptyPropMatch = fullCode.match(/empty\s*\(\s*\$([a-zA-Z0-9_]+)->([a-zA-Z0-9_]+)\s*\)/);
+    const propMatch = emptyPropMatch || fullCode.match(/\$([a-zA-Z0-9_]+)->([a-zA-Z0-9_]*s3[a-zA-Z0-9_]*)/i);
+    const recordVar = propMatch ? propMatch[1] : 'record';
+    const propName = propMatch ? propMatch[2] : 's3_path';
+    const s3PathExpr = `${recordVar}->${propName}`;
+
+    let s3CallExpr = `connect() & getObjectContent(${s3PathExpr})`;
+    const s3MethodMatch = fullCode.match(/S3Helper::([a-zA-Z0-9_]+)\s*\(/);
+    if (s3MethodMatch) {
+      s3CallExpr = `connect() & ${s3MethodMatch[1]}(${s3PathExpr})`;
+    }
+
+    let transformExpr = null;
+    const decodeMatches = [...fullCode.matchAll(/(\$[a-zA-Z0-9_]+)\s*=\s*json_decode\s*\(\s*\$([a-zA-Z0-9_]+)/g)];
+    const nonCacheDecode = decodeMatches.find(m => m[2] !== 'raw');
+    if (nonCacheDecode) {
+      transformExpr = `Extract ${nonCacheDecode[1]}`;
+    }
+
+    return {
+      missingRecordCondition: `$${recordVar} tidak ditemukan / ${propName} kosong`,
+      validRecordCondition: `$${recordVar} siap & ${propName} valid`,
+      fallbackCall,
+      s3PathExpr,
+      s3CallExpr,
+      s3ReturnVar: 'jsonContent',
+      transformExpr
+    };
+  }
+
+  /**
+   * Extract Domain Service calls directly from AST call sites and field types
+   */
+  extractServiceCallsFromAst(fullCode, callGraph, controllerName) {
+    const results = [];
+    const fieldTypeMap = new Map();
+
+    for (const cls of callGraph.fileAst.classes) {
+      for (const field of cls.fields) {
+        fieldTypeMap.set(field.name, field.type);
+      }
+    }
+    if (callGraph.externalFileAsts) {
+      for (const extAst of callGraph.externalFileAsts.values()) {
+        for (const cls of extAst.classes) {
+          for (const field of cls.fields) {
+            fieldTypeMap.set(field.name, field.type);
+          }
+        }
+      }
+    }
+
+    const callRegex = /(?:(?:const|let|var|[A-Za-z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*(?::=|=)\s*(?:await\s+)?)?(?:await\s+)?(?:this\.)?([a-zA-Z0-9_]+)\s*(?:\.|->|::)\s*([a-zA-Z0-9_]+)\s*\(([^)]*)\)/g;
+    let match;
+
+    while ((match = callRegex.exec(fullCode)) !== null) {
+      const assignedVar = match[1] ? match[1].trim() : null;
+      const obj = match[2].trim();
+      const method = match[3].trim();
+      const args = match[4].trim();
+
+      const resolvedClass = fieldTypeMap.get(obj) || obj;
+      if (
+        resolvedClass !== controllerName &&
+        /(?:Service|UseCase|Manager|Interactor)$/i.test(resolvedClass)
+      ) {
+        results.push({
+          serviceClass: resolvedClass,
+          objectName: obj,
+          method,
+          args,
+          assignedVar
+        });
+      }
+    }
+
+    return results;
+  }
+
+  extractExternalGatewayCall(fullCode, rules) {
+    // Check explicit Gateway / Client calls (e.g. PaymentGateway.charge(...))
+    const gwMatch = fullCode.match(/(?:const|let|var)?\s*([a-zA-Z0-9_]+)?\s*=?\s*(?:await\s+)?([A-Za-z0-9_]*(?:Gateway|Client|Http|axios|requests|httpx))\s*(?:\.|::)\s*([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+    if (gwMatch) {
+      return {
+        label: gwMatch[2],
+        callExpr: `${gwMatch[3]}(${gwMatch[4].trim()})`,
+        returnVar: gwMatch[1] || '200 OK (Response)'
+      };
+    }
+
+    for (const rx of rules.externalCallRegexes) {
+      rx.lastIndex = 0;
+      const m = rx.exec(fullCode);
+      if (m) {
+        return {
+          label: 'External Gateway / API',
+          callExpr: m[0],
+          returnVar: '200 OK (Response)'
+        };
+      }
+    }
+
+    return null;
+  }
+
+  extractDatabaseOperations(fullCode, rules) {
+    const ops = [];
+    // Detect ORM query chains like db.query(Item).filter(...).first() or db.commit()
+    const dbChainRegex = /\b(db|repository|repo|session|entityManager)\s*\.\s*([a-zA-Z0-9_]+\([^;\n]*)/gi;
+    let match;
+    while ((match = dbChainRegex.exec(fullCode)) !== null) {
+      ops.push(`${match[1]}.${match[2].trim()}`);
+    }
+
+    if (ops.length > 0) {
+      return {
+        label: 'Database (Storage / ORM)',
+        operations: ops,
+        returnLabel: 'DB Commit / Query Result'
+      };
+    }
+
+    // Check if any service call performs persistence mutations (createOrder, markAsPaid, save, etc.)
+    const persistenceCall = fullCode.match(/\b([A-Za-z0-9_]+)\s*\.\s*((?:create|save|update|delete|insert|markAs|findBy)[A-Za-z0-9_]*)\s*\(([^)]*)\)/);
+    if (persistenceCall) {
+      return {
+        label: 'Database (Storage / ORM)',
+        operations: [`${persistenceCall[2]}(${persistenceCall[3].trim()})`],
+        returnLabel: 'DB Commit Success'
+      };
+    }
+
+    return null;
+  }
+
+  extractQueueOperations(fullCode, rules) {
+    const queueMatch = fullCode.match(/(?:await\s+)?([a-zA-Z0-9_]*(?:Queue|Broker|Bus|Producer|Event|notification_broker)[a-zA-Z0-9_]*)\s*(?:\.|::)\s*([a-zA-Z0-9_]+)\s*\(([^)]*)\)/i);
+    if (queueMatch) {
+      return {
+        label: `${queueMatch[1]} (Message Broker)`,
+        callExpr: `${queueMatch[2]}(${queueMatch[3].trim()})`
+      };
+    }
+    return null;
+  }
+
+  extractSuccessResponse(code, rules) {
+    // Express res.status(201).json(...)
+    const expressMatch = code.match(/res\.status\((\d+)\)\.json\(([^)]+)\)/g);
+    if (expressMatch && expressMatch.length > 0) {
+      const last = expressMatch[expressMatch.length - 1];
+      const m = last.match(/res\.status\((\d+)\)\.json\(([^)]+)\)/);
+      if (m) return `${m[1]} OK (${m[2].trim()})`;
+    }
+
+    // Gin c.JSON(http.StatusOK, ...)
+    const ginMatch = code.match(/c\.JSON\(\s*http\.Status([A-Za-z]+)\s*,\s*([^)]+)\)/g);
+    if (ginMatch && ginMatch.length > 0) {
+      const last = ginMatch[ginMatch.length - 1];
+      const m = last.match(/http\.Status([A-Za-z]+)\s*,\s*([^)]+)/);
+      if (m) return `200 ${m[1]} (${m[2].trim()})`;
+    }
+
+    // Spring ResponseEntity.ok(...)
+    const springMatch = code.match(/ResponseEntity\.(ok|created)\(([^)]*)\)/);
+    if (springMatch) {
+      return `200 OK (${springMatch[2].trim()})`;
+    }
+
+    return '200 OK';
+  }
+
+  extractErrorPathways(fullCode, rules) {
+    const errors = [];
+    let match;
+
+    // 1. Java / C# / PHP / TS typed catch blocks: catch (InsufficientFundsException e)
+    const typedCatchRegex = /catch\s*\(\s*([A-Za-z0-9_\\]+)(?:\s+\$?[a-zA-Z0-9_]+)?\s*\)\s*\{([^}]*)\}/g;
+    while ((match = typedCatchRegex.exec(fullCode)) !== null) {
+      const rawType = match[1].split('\\').pop();
+      const block = match[2];
+      const statusMatch = block.match(/status\((\d+)\)/);
+      const status = statusMatch ? Number(statusMatch[1]) : (rawType === 'Exception' || rawType === 'err' ? 500 : 400);
+      const msgMatch = block.match(/(?:body|json)\(\s*["']?([^"')]+)["']?\s*\)/);
+      errors.push({
+        type: rawType.includes('Exception') || rawType.includes('Error') ? rawType : 'CaughtException',
+        status,
+        message: msgMatch ? msgMatch[1].trim() : 'Handled exception in catch block'
+      });
+    }
+
+    // 2. Python FastAPI HTTPException: raise HTTPException(status_code=404, detail="Item not found")
+    const pyHttpRegex = /raise\s+HTTPException\s*\(\s*status_code\s*=\s*(\d+)\s*,\s*detail\s*=\s*["']([^"']+)["']\s*\)/g;
+    while ((match = pyHttpRegex.exec(fullCode)) !== null) {
+      errors.push({
+        type: 'HTTPException',
+        status: Number(match[1]),
+        message: match[2]
+      });
+    }
+
+    // 3. Express error status returns: return res.status(403).json({ error: "User suspended" })
+    const expressErrRegex = /res\.status\(([45]\d\d)\)\.json\(\{\s*error:\s*([^}]+)\}\)/g;
+    while ((match = expressErrRegex.exec(fullCode)) !== null) {
+      errors.push({
+        type: Number(match[1]) >= 500 ? 'InternalServerError' : 'HttpErrorResponse',
+        status: Number(match[1]),
+        message: match[2].replace(/^["']|["']$/g, '').trim()
+      });
+    }
+
+    // 4. Go if err != nil with c.JSON(http.StatusUnauthorized, ...)
+    const goErrRegex = /if\s+err\s*!=\s*nil\s*\{[^}]*c\.JSON\(\s*http\.Status([A-Za-z]+)\s*,\s*[^)]*"error":\s*"([^"]+)"/g;
+    while ((match = goErrRegex.exec(fullCode)) !== null) {
+      const statusMap = { BadRequest: 400, Unauthorized: 401, Forbidden: 403, NotFound: 404, InternalServerError: 500 };
+      errors.push({
+        type: `Go${match[1]}Error`,
+        status: statusMap[match[1]] || 500,
+        message: match[2]
+      });
+    }
+
+    return errors;
+  }
+
+  /**
+   * Extract real classes, fields, and methods from AST for Class Diagram generation
+   */
+  extractModelsForClassDiagram(callGraphOrAst, modelMatches, participants, steps) {
+    const models = [];
+    const fileAst = callGraphOrAst?.fileAst || callGraphOrAst || { classes: [] };
+    const extAsts = callGraphOrAst?.externalFileAsts ? Array.from(callGraphOrAst.externalFileAsts.values()) : [];
+
+    for (const ast of [fileAst, ...extAsts]) {
+      for (const cls of ast.classes || []) {
+        if (!models.some(m => m.name === cls.name)) {
+          models.push({
+            name: cls.name,
+            fields: cls.fields.map(f => ({ name: f.name, type: f.type })),
+            methods: cls.methods
+          });
+        }
+      }
+    }
+
+    for (const modelName of modelMatches) {
+      if (!models.some(m => m.name === modelName)) {
+        models.push({
+          name: modelName,
+          fields: [{ name: 'id', type: 'Identifier' }],
+          methods: ['where', 'first']
+        });
+      }
+    }
+
+    if (models.length === 0 && participants.length > 0) {
+      for (const p of participants) {
+        if (p.type === 'actor') continue;
+        const cleanName = p.label.replace(/[^a-zA-Z0-9_]/g, '') || p.id;
+        const outgoingMethods = steps
+          .filter(s => s.to === p.id && !s.isReturn && s.message)
+          .map(s => s.message.split('(')[0].replace(/[^a-zA-Z0-9_]/g, ''))
+          .filter(Boolean);
+        models.push({
+          name: cleanName,
+          fields: [],
+          methods: Array.from(new Set(outgoingMethods))
+        });
+      }
+    }
+
+    return models;
+  }
+
+  /**
+   * Pencarian file yang mengandung pola endpoint di repository dengan menegakkan ekstensi profil
    */
   findFileByEndpoint(urlPath, profile) {
     const cleanUrl = urlPath.replace(/^\//, '');
+    const allowedExts = profile?.extensions && !profile.extensions.includes('.*') ? new Set(profile.extensions) : null;
     try {
       const files = this.scanDirRecursive(this.rootDir);
       for (const file of files) {
-        if (file.includes('node_modules') || file.includes('.git') || file.includes('dist')) continue;
+        if (allowedExts && !allowedExts.has(path.extname(file).toLowerCase())) continue;
         const content = fs.readFileSync(file, 'utf8');
         if (content.includes(cleanUrl) || content.includes(urlPath)) {
           return file;
@@ -627,9 +1130,14 @@ export class TracerEngine {
     try {
       const files = this.scanDirRecursive(this.rootDir);
       for (const file of files) {
-        if (file.includes('node_modules') || file.includes('.git')) continue;
         const content = fs.readFileSync(file, 'utf8');
-        if (content.includes(`function ${functionName}`) || content.includes(`def ${functionName}`) || content.includes(`fn ${functionName}`) || content.includes(`func ${functionName}`)) {
+        if (
+          content.includes(`function ${functionName}`) ||
+          content.includes(`def ${functionName}`) ||
+          content.includes(`fn ${functionName}`) ||
+          content.includes(`func ${functionName}`) ||
+          new RegExp(`\\b${functionName}\\s*\\(`).test(content)
+        ) {
           return file;
         }
       }
@@ -655,16 +1163,16 @@ export class TracerEngine {
     return results;
   }
 
-  generateSyntheticTrace(method, urlPath, profile, detailLevel = 'standard') {
+  generateUnresolvedEndpointTrace(method, urlPath, profile, detailLevel = 'standard') {
     const cleanEndpoint = `${method || 'POST'} ${urlPath}`;
     const aliases = this.config.participantsAliases || {};
     const isL1 = detailLevel === 'L1' || detailLevel === 'high';
 
     const participants = [
       { id: 'Client', label: aliases['Client'] || 'Client / Frontend App', type: 'actor' },
-      { id: 'Ctrl', label: aliases['Ctrl'] || 'API Controller / Handler', type: 'participant' },
-      { id: 'Svc', label: aliases['Svc'] || 'Core Business Service', type: 'participant' },
-      { id: 'DB', label: aliases['DB'] || 'Database (SQL/NoSQL)', type: 'participant' }
+      { id: 'Ctrl', label: aliases['Ctrl'] || 'API Controller / Handler', type: 'participant', layer: 'Presentation Layer' },
+      { id: 'Svc', label: aliases['Svc'] || 'Domain Service', type: 'participant', layer: 'Domain & Application Layer' },
+      { id: 'DB', label: aliases['DB'] || 'Database (SQL/NoSQL)', type: 'participant', layer: 'Persistence & Cache Layer' }
     ];
 
     const steps = [
@@ -677,10 +1185,10 @@ export class TracerEngine {
       steps.push({ type: 'alt_else', condition: 'Valid Payload (Proceed)' });
     }
 
-    steps.push({ from: 'Ctrl', to: 'Svc', message: 'executeBusinessLogic(requestData)', isAsync: false });
-    steps.push({ from: 'Svc', to: 'DB', message: 'INSERT / UPDATE Record (Transaction)', isAsync: false });
-    steps.push({ from: 'DB', to: 'Svc', message: 'Query Result (Committed)', isReturn: true });
-    steps.push({ from: 'Svc', to: 'Ctrl', message: 'Result Object', isReturn: true });
+    steps.push({ from: 'Ctrl', to: 'Svc', message: `handle(${ JSON.stringify(urlPath) })`, isAsync: false });
+    steps.push({ from: 'Svc', to: 'DB', message: 'Execute Atomic Transaction', isAsync: false });
+    steps.push({ from: 'DB', to: 'Svc', message: 'Committed Record', isReturn: true });
+    steps.push({ from: 'Svc', to: 'Ctrl', message: 'Domain Result', isReturn: true });
     steps.push({ from: 'Ctrl', to: 'Client', message: '200 OK / 201 Created', isReturn: true });
 
     if (!isL1) {
@@ -689,34 +1197,35 @@ export class TracerEngine {
 
     return {
       endpoint: cleanEndpoint,
+      profileUsed: profile?.language || 'generic',
       participants,
       steps,
       errorBranches: [
         { type: 'ValidationException', status: 400, message: 'Validation Failed' },
         { type: 'DatabaseException', status: 500, message: 'Transaction Failed' }
-      ]
+      ],
+      models: []
     };
   }
 
-  generateSyntheticFunctionTrace(functionName, profile, detailLevel = 'standard') {
+  generateUnresolvedFunctionTrace(functionName, profile, detailLevel = 'standard') {
     const participants = [
       { id: 'Caller', label: 'Caller Function', type: 'actor' },
-      { id: 'Target', label: `${functionName}()`, type: 'participant' },
-      { id: 'Helper', label: 'Internal Utility / ORM', type: 'participant' }
+      { id: 'Target', label: `${functionName}()`, type: 'participant', layer: 'Domain & Application Layer' }
     ];
 
     const steps = [
       { from: 'Caller', to: 'Target', message: `${functionName}(params)`, isAsync: false },
-      { from: 'Target', to: 'Helper', message: 'validateAndTransform(params)', isAsync: false },
-      { from: 'Helper', to: 'Target', message: 'processedData', isReturn: true },
       { from: 'Target', to: 'Caller', message: 'return result', isReturn: true }
     ];
 
     return {
       targetName: functionName,
+      profileUsed: profile?.language || 'generic',
       participants,
       steps,
-      errorBranches: []
+      errorBranches: [],
+      models: [{ name: functionName, fields: [], methods: [functionName] }]
     };
   }
 }

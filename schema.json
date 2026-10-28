@@ -35,7 +35,8 @@
         "windsurf": { "type": "boolean" },
         "copilot": { "type": "boolean" },
         "cline": { "type": "boolean" },
-        "kiro": { "type": "boolean" }
+        "kiro": { "type": "boolean" },
+        "continue": { "type": "boolean" }
       }
     },
     "output": {
